@@ -43,7 +43,8 @@ struct HomeView: View {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: .now)
         let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: today) ?? today
-        return unpaidEntries.filter { $0.dueDate <= oneWeekAgo }.count
+        let overdueSuki = Set(unpaidEntries.filter { $0.dueDate <= oneWeekAgo }.map(\.customer))
+        return overdueSuki.count
     }
 
     // Group entries by transaction or customer for the list
@@ -83,6 +84,7 @@ struct HomeView: View {
 
     private var groupedTransactions: [TransactionGroup] {
         let filtered = allEntries.filter { entry in
+            guard entry.quantity > 0 else { return false }
             if searchText.isEmpty { return true }
             return entry.customer.localizedCaseInsensitiveContains(searchText) ||
                    entry.item.localizedCaseInsensitiveContains(searchText)
@@ -302,7 +304,7 @@ struct HomeView: View {
             CustomerDetailView(customerName: item.name)
         }
         .onAppear {
-            if allEntries.contains(where: { $0.customer == "Kurt Paul" }) {
+            if allEntries.contains(where: { $0.customer == "Kurt Paul" }) || overdueCount < 3 {
                 resetToFigmaDemoData()
             }
         }
@@ -404,7 +406,7 @@ struct CustomerDetailView: View {
     @Query private var allEntries: [LedgerEntry]
 
     private var customerEntries: [LedgerEntry] {
-        allEntries.filter { $0.customer == customerName }
+        allEntries.filter { $0.customer == customerName && $0.quantity > 0 }
     }
 
     private var totalCustomerUtang: Double {
@@ -458,6 +460,7 @@ struct CustomerDetailView: View {
                                             withAnimation {
                                                 entry.isPaid.toggle()
                                                 entry.paidAt = entry.isPaid ? .now : nil
+                                                try? modelContext.save()
                                             }
                                         }
                                         .font(.system(size: 12, weight: .bold, design: .rounded))

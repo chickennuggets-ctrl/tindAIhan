@@ -310,8 +310,8 @@ extension LedgerEntry {
                 item: "mantika",
                 quantity: 2,
                 unitPrice: 52.0,
-                createdAt: calendar.date(byAdding: .day, value: -6, to: now) ?? now,
-                dueDate: pastDue,
+                createdAt: calendar.date(byAdding: .day, value: -8, to: now) ?? now,
+                dueDate: pastDueLong,
                 isPaid: false
             ),
             LedgerEntry(
@@ -321,8 +321,8 @@ extension LedgerEntry {
                 item: "asukal",
                 quantity: 2,
                 unitPrice: 50.0,
-                createdAt: calendar.date(byAdding: .day, value: -6, to: now) ?? now,
-                dueDate: pastDue,
+                createdAt: calendar.date(byAdding: .day, value: -8, to: now) ?? now,
+                dueDate: pastDueLong,
                 isPaid: false
             ),
 

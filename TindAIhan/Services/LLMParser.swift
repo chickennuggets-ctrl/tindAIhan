@@ -116,6 +116,7 @@ final class LLMParser {
         let lower = text.lowercased()
 
         let namePrefixes = [
+            "pabili po para kay ", "pabili kay ", "lista kay ", "lista ni ",
             "utang ni ", "utang kay ", "palista kay ", "palista ni ",
             "para kay ", "kay ", "ni "
         ]
@@ -161,6 +162,59 @@ final class LLMParser {
             }
         }
 
+        // Check if starts with Filipino honorifics: Aling, Mang, Kuya, Ate, Tita, Tito, Nanay, Tatay, Ka, Lola, Lolo
+        if customerName == "Suki" {
+            let honorifics = ["aling ", "mang ", "kuya ", "ate ", "tita ", "tito ", "nanay ", "tatay ", "ka ", "lola ", "lolo "]
+            for h in honorifics {
+                if text.lowercased().hasPrefix(h) {
+                    let words = text.split(separator: " ").map(String.init)
+                    var nameParts: [String] = []
+                    for w in words {
+                        let wLower = w.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ",:-"))
+                        if isQuantityWord(wLower) || Int(wLower) != nil {
+                            break
+                        }
+                        nameParts.append(w.trimmingCharacters(in: CharacterSet(charactersIn: ",:-")))
+                    }
+                    if !nameParts.isEmpty {
+                        customerName = nameParts.joined(separator: " ").capitalized
+                        if let idx = text.range(of: nameParts.joined(separator: " "))?.upperBound {
+                            text = String(text[idx...])
+                        }
+                    }
+                    break
+                }
+            }
+        }
+
+        // Check if leading word is a customer name before the first quantity word (e.g. "Pedro 2 itlog")
+        if customerName == "Suki" {
+            let words = text.split(separator: " ").map(String.init)
+            if words.count >= 2 {
+                let firstWord = words[0].trimmingCharacters(in: CharacterSet(charactersIn: ",:-"))
+                let secondWord = words[1].lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ",:-"))
+                if (isQuantityWord(secondWord) || Int(secondWord) != nil) && !isQuantityWord(firstWord.lowercased()) {
+                    customerName = firstWord.capitalized
+                    text = words.dropFirst().joined(separator: " ")
+                }
+            }
+        }
+
+        // Check trailing name (e.g. "2 itlog tsaka 1 bigas ni Aling Nena")
+        if customerName == "Suki" {
+            for suffix in [" para kay ", " kay ", " ni "] {
+                if let r = text.lowercased().range(of: suffix, options: .backwards) {
+                    let candidate = text[r.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+                    let words = candidate.split(separator: " ")
+                    if !words.isEmpty && words.count <= 3 {
+                        customerName = candidate.capitalized
+                        text = String(text[..<r.lowerBound])
+                        break
+                    }
+                }
+            }
+        }
+
         // 2. Parse Items and Quantities
         var cleanedItems = text
         for conj in [" tsaka ", " saka ", " at saka ", " at ", " and ", " + "] {
@@ -180,18 +234,18 @@ final class LLMParser {
 
             var i = 0
             while i < words.count {
-                let word = words[i]
+                let word = words[i].trimmingCharacters(in: CharacterSet(charactersIn: ",.-"))
                 let lowerWord = word.lowercased()
 
                 if let num = parseQuantity(lowerWord) {
                     qty = num
                     if i + 1 < words.count {
-                        let nextWord = words[i + 1].lowercased()
-                        if ["na", "ng", "piraso", "pirasong", "kilo", "kilos", "pack", "packs", "can", "cans"].contains(nextWord) {
+                        let nextWord = words[i + 1].lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ",.-"))
+                        if ["na", "ng", "piraso", "pirasong", "kilo", "kilong", "kilos", "kg", "pack", "packs", "can", "cans", "lata", "latang", "bote", "boteng", "balot", "sachet", "sachets", "kaban"].contains(nextWord) {
                             i += 1
                         }
                     }
-                } else if !["ng", "muna", "paki", "pakilista", "po", "daw", "tsaka", "saka"].contains(lowerWord) {
+                } else if !["ng", "muna", "paki", "pakilista", "po", "daw", "raw", "tsaka", "saka", "at", "naman", "nga", "pala"].contains(lowerWord) {
                     itemTokens.append(word)
                 }
                 i += 1
@@ -222,15 +276,21 @@ final class LLMParser {
         case "tatlo", "tatlong", "tres": return 3
         case "apat", "apat na", "kwatro": return 4
         case "lima", "limang", "singko": return 5
-        case "anim", "anim na": return 6
-        case "pito", "pitong": return 7
-        case "walo", "walong": return 8
-        case "siyam", "siyam na": return 9
+        case "anim", "anim na", "sais": return 6
+        case "pito", "pitong", "syete": return 7
+        case "walo", "walong", "otso": return 8
+        case "siyam", "siyam na", "nuwebe": return 9
         case "sampu", "sampung", "diyes": return 10
-        case "labing-isa", "labingisa": return 11
-        case "labindalawa": return 12
-        case "dosenang", "dosena": return 12
-        case "beinte", "dalawampu": return 20
+        case "labing-isa", "labingisa", "onse": return 11
+        case "labindalawa", "dose", "dosena", "dosenang": return 12
+        case "labintatlo", "trese": return 13
+        case "labing-apat", "katorse": return 14
+        case "labinlima", "kinse": return 15
+        case "dalawampu", "dalawampung", "beinte": return 20
+        case "tatlumpu", "trenta": return 30
+        case "apatnapu", "kwarenta": return 40
+        case "limampu", "singkwenta": return 50
+        case "daan", "isang daan", "sandaan": return 100
         default: return nil
         }
     }

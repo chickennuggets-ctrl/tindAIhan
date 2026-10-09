@@ -41,6 +41,14 @@ enum TindAITheme {
     static let textMuted = Color(red: 139/255, green: 151/255, blue: 162/255) // #8B97A2
 
     static func avatarColor(for name: String) -> Color {
+        let lower = name.lowercased()
+        if lower.contains("nena") { return avatarYellow }
+        if lower.contains("jose") { return avatarTeal }
+        if lower.contains("pedro") { return avatarPink }
+        if lower.contains("baby") { return avatarYellow }
+        if lower.contains("jobert") { return avatarTeal }
+        if lower.contains("marites") { return avatarPink }
+        if lower.contains("tess") { return avatarPink }
         let colors = [avatarYellow, avatarTeal, avatarPink, avatarOrange, avatarBlue]
         let hash = abs(name.hashValue)
         return colors[hash % colors.count]
