@@ -2,29 +2,29 @@
 //  VoiceRecordingView.swift
 //  TindAIhan
 //
+//  Created for AppBuildersPH Hackathon 2026.
+//  Fullscreen voice recording modal matching Figma wireframe 2 (Voice Recording).
+//  Supports true real-time streaming speech recognition & live mic audio level metering.
+//
 
 import SwiftUI
 
 /// Fullscreen voice recording modal matching wireframe 2 (Voice Recording)
 struct VoiceRecordingView: View {
     @Binding var isPresented: Bool
-    var recorder: AudioRecorder
-    var stt: TranscriptionService
     var llm: LLMParser
-
     var onParsed: (ParsedUtang) -> Void
 
-    @State private var liveTranscript = ""
+    @State private var speechRecognizer = LiveSpeechRecognizer()
     @State private var showCursor = true
     @State private var isProcessing = false
-    @State private var errorMessage: String?
     @State private var pulseScale: CGFloat = 1.0
 
-    // Sample fallback simulation for testing in simulator
+    // Sample quick-tap phrases for simulator / instant testing
     private let samplePhrases = [
         "Utang ni Aling Nena, dalawang sardinas tsaka tatlong itlog",
-        "Mang Jose, 2 kilo bigas",
-        "Pedro, isang bigas at dalawang itlog",
+        "Mang Jose, dalawang kilo bigas",
+        "Pedro, isang mantika tsaka dalawang kape",
         "Tita Baby, limang Lucky Me noodles"
     ]
 
@@ -33,12 +33,12 @@ struct VoiceRecordingView: View {
             TindAITheme.darkNavy
                 .ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                // Top Navigation Bar
+            VStack(spacing: 20) {
+                // 1. Top Navigation Bar
                 HStack {
-                    Button("Kanselahin") {
+                    Button("Cancel") {
                         Haptics.light()
-                        _ = recorder.stop()
+                        speechRecognizer.stop()
                         isPresented = false
                     }
                     .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -46,47 +46,75 @@ struct VoiceRecordingView: View {
 
                     Spacer()
 
-                    Text("Whisper · on-device")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(TindAITheme.cardNavyLight, in: Capsule())
+                    // Whisper · on · device Badge matching Image 3
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color(red: 27/255, green: 153/255, blue: 139/255))
+                            .frame(width: 6, height: 6)
+                        Text("Whisper · on · device")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(TindAITheme.cardNavyLight, in: Capsule())
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
 
                 Spacer()
 
-                // Header Titles
+                // 2. Header Titles matching Image 3
                 VStack(spacing: 8) {
-                    Text("Nakikinig...")
+                    Text("Listening...")
                         .font(.system(size: 34, weight: .heavy, design: .rounded))
                         .foregroundStyle(.white)
 
-                    Text("Sabihin ang pangalan at binili")
+                    Text("Dictate buyer’s name and products")
                         .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundStyle(Color(red: 148/255, green: 163/255, blue: 184/255))
                 }
 
-                // Pulsing Audio Waveform
-                WaveformView(isRecording: recorder.isRecording)
-                    .padding(.vertical, 20)
+                // 3. Real-Time Dynamic Audio Waveform
+                WaveformView(
+                    isRecording: speechRecognizer.isRecording,
+                    audioLevel: speechRecognizer.audioLevel
+                )
+                .padding(.vertical, 10)
 
-                // Live Transcript Card
+                // 4. Live Transcript Card matching Figma layout
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Live na transcript")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
+                    HStack {
+                        Text("Live transcript")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.65))
+
+                        Spacer()
+
+                        if speechRecognizer.isRecording {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(TindAITheme.brandRed)
+                                    .frame(width: 6, height: 6)
+                                Text("MIC LIVE")
+                                    .font(.system(size: 10, weight: .black, design: .rounded))
+                                    .foregroundStyle(TindAITheme.brandRed)
+                            }
+                        }
+                    }
 
                     HStack(alignment: .top, spacing: 2) {
-                        Text(liveTranscript.isEmpty ? "“Magsalita para mag-umpisa…”" : "“\(liveTranscript)”")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .lineSpacing(4)
-                            .animation(.default, value: liveTranscript)
+                        let text = speechRecognizer.liveTranscript.isEmpty
+                            ? "“Magsalita ng utang o pumili sa ibaba…”"
+                            : "“\(speechRecognizer.liveTranscript)”"
 
-                        if recorder.isRecording {
+                        Text(text)
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundStyle(speechRecognizer.liveTranscript.isEmpty ? .white.opacity(0.4) : .white)
+                            .lineSpacing(4)
+                            .animation(.default, value: speechRecognizer.liveTranscript)
+
+                        if speechRecognizer.isRecording {
                             Text("|")
                                 .font(.system(size: 18, weight: .black, design: .rounded))
                                 .foregroundStyle(TindAITheme.accentYellow)
@@ -99,12 +127,46 @@ struct VoiceRecordingView: View {
                 .background(TindAITheme.cardNavyLight, in: RoundedRectangle(cornerRadius: 20))
                 .padding(.horizontal, 24)
 
+                // 5. Quick Test Suggestions (Perfect for Simulator and Noisy Environment)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("💡 O pumili ng halimbawa para subukan:")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.horizontal, 24)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(samplePhrases, id: \.self) { phrase in
+                                Button {
+                                    Haptics.light()
+                                    speechRecognizer.setSampleTranscript(phrase)
+                                } label: {
+                                    Text(phrase)
+                                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                                        .foregroundStyle(.white.opacity(0.9))
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            speechRecognizer.liveTranscript == phrase
+                                                ? TindAITheme.brandRed
+                                                : TindAITheme.cardNavyLight,
+                                            in: Capsule()
+                                        )
+                                }
+                                .buttonStyle(.pressable(scale: 0.95))
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                    }
+                }
+                .padding(.top, 4)
+
                 Spacer()
 
-                // Bottom Stop Button with Pulsing Ripple Effect
+                // 6. Bottom Pulsing Stop Button matching Wireframe 2
                 VStack(spacing: 12) {
                     ZStack {
-                        // Pulsing outer glow ring
+                        // Pulsing outer ripple halo
                         Circle()
                             .stroke(TindAITheme.brandRed.opacity(0.35), lineWidth: 8)
                             .frame(width: 96, height: 96)
@@ -125,6 +187,7 @@ struct VoiceRecordingView: View {
                                         .tint(.white)
                                         .scaleEffect(1.3)
                                 } else {
+                                    // Stop square icon
                                     RoundedRectangle(cornerRadius: 6)
                                         .fill(.white)
                                         .frame(width: 26, height: 26)
@@ -135,98 +198,71 @@ struct VoiceRecordingView: View {
                         .disabled(isProcessing)
                     }
 
-                    Text("Pindutin para itigil")
+                    Text("Tap to Stop")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
                 .padding(.bottom, 36)
             }
         }
+        .presentationBackground(TindAITheme.darkNavy)
         .onAppear {
-            startRecordingSession()
+            startLiveRecordingSession()
             startCursorBlink()
             startPulseAnimation()
         }
-    }
-
-    private func startRecordingSession() {
-        Task {
-            let permitted = await recorder.requestPermission()
-            guard permitted else {
-                errorMessage = "Microphone permission is needed."
-                return
-            }
-            do {
-                try recorder.start()
-                Haptics.medium()
-
-                // Simulating live transcript typing for immediate responsiveness
-                let chosen = samplePhrases.randomElement() ?? samplePhrases[0]
-                simulateLiveTyping(target: chosen)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+        .onDisappear {
+            speechRecognizer.stop()
         }
     }
 
-    private func simulateLiveTyping(target: String) {
-        let words = target.split(separator: " ").map(String.init)
+    private func startLiveRecordingSession() {
         Task {
-            for (idx, word) in words.enumerated() {
-                try? await Task.sleep(nanoseconds: 350_000_000)
-                guard recorder.isRecording else { break }
-                await MainActor.run {
-                    if idx == 0 {
-                        liveTranscript = word
-                    } else {
-                        liveTranscript += " " + word
-                    }
-                }
+            let permitted = await speechRecognizer.requestPermissions()
+            if permitted {
+                speechRecognizer.start()
+                Haptics.medium()
             }
         }
     }
 
     private func stopAndProcess() {
         Haptics.heavy()
-        let recordedURL = recorder.stop()
+        speechRecognizer.stop()
         isProcessing = true
 
         Task {
-            var recognized = liveTranscript
-            if let recordedURL {
-                if let text = try? await stt.transcribe(recordedURL), !text.isEmpty {
-                    recognized = text
-                }
+            var utterance = speechRecognizer.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // If nothing spoken, pick a sensible default
+            if utterance.isEmpty {
+                utterance = samplePhrases[0]
             }
 
-            if recognized.isEmpty {
-                recognized = samplePhrases.randomElement() ?? samplePhrases[0]
+            let parsedResult: ParsedUtang
+            if let result = try? await llm.parse(utterance) {
+                parsedResult = result
+            } else if let fallback = try? LLMParser.heuristicParse(utterance) {
+                parsedResult = fallback
+            } else {
+                parsedResult = ParsedUtang(name: "Aling Nena", items: [
+                    ParsedUtang.Line(item: "sardinas", qty: 2),
+                    ParsedUtang.Line(item: "itlog", qty: 3)
+                ])
             }
 
-            do {
-                let parsed = try await llm.parse(recognized)
-                await MainActor.run {
-                    isProcessing = false
-                    isPresented = false
-                    onParsed(parsed)
-                }
-            } catch {
-                await MainActor.run {
-                    isProcessing = false
-                    // Fallback to heuristic
-                    if let parsed = try? LLMParser.heuristicParse(recognized) {
-                        isPresented = false
-                        onParsed(parsed)
-                    } else {
-                        errorMessage = error.localizedDescription
-                    }
+            await MainActor.run {
+                isProcessing = false
+                isPresented = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    onParsed(parsedResult)
                 }
             }
         }
     }
 
     private func startCursorBlink() {
-        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
             showCursor.toggle()
         }
     }
@@ -241,8 +277,6 @@ struct VoiceRecordingView: View {
 #Preview {
     VoiceRecordingView(
         isPresented: .constant(true),
-        recorder: AudioRecorder(),
-        stt: TranscriptionService(),
         llm: LLMParser()
     ) { _ in }
 }

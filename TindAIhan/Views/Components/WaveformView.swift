@@ -2,15 +2,20 @@
 //  WaveformView.swift
 //  TindAIhan
 //
+//  Created for AppBuildersPH Hackathon 2026.
+//  Dynamic real-time audio waveform responding live to microphone audio levels
+//  and rhythmic voice oscillations matching Figma wireframe 2.
+//
 
 import SwiftUI
 
 /// Animated audio waveform bars matching wireframe 2 (Voice Recording)
 struct WaveformView: View {
     var isRecording: Bool
+    var audioLevel: CGFloat = 0.0
     @State private var phase: CGFloat = 0
 
-    // Heights for 9 bars to create that natural symmetric voice curve
+    // Heights for 9 bars creating the symmetric voice envelope from wireframe
     private let baseHeights: [CGFloat] = [32, 54, 78, 110, 130, 95, 72, 48, 28]
 
     var body: some View {
@@ -20,6 +25,7 @@ struct WaveformView: View {
                     baseHeight: baseHeights[index],
                     index: index,
                     isRecording: isRecording,
+                    audioLevel: audioLevel,
                     phase: phase
                 )
             }
@@ -38,7 +44,7 @@ struct WaveformView: View {
     }
 
     private func startAnimation() {
-        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+        withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
             phase = 1.0
         }
     }
@@ -48,14 +54,21 @@ private struct WaveBar: View {
     let baseHeight: CGFloat
     let index: Int
     let isRecording: Bool
+    let audioLevel: CGFloat
     let phase: CGFloat
 
-    // Modulate height with sinusoidal phase offset
     private var currentHeight: CGFloat {
         guard isRecording else { return 12 }
-        let offset = sin(phase * .pi + Double(index) * 0.7)
-        let scale = 0.6 + 0.45 * CGFloat(abs(offset))
-        return max(16, min(140, baseHeight * scale))
+
+        // Blend live mic RMS power with gentle wave breathing
+        let waveOffset = sin(phase * .pi + Double(index) * 0.7)
+        let baseline = 0.5 + 0.35 * CGFloat(abs(waveOffset))
+
+        // When mic has input, scale strongly by audioLevel
+        let micBoost = max(audioLevel * 1.6, 0.0)
+        let finalScale = min(baseline + micBoost, 1.4)
+
+        return max(16, min(140, baseHeight * finalScale))
     }
 
     var body: some View {
@@ -63,9 +76,8 @@ private struct WaveBar: View {
             .fill(TindAITheme.accentYellow)
             .frame(width: 8, height: currentHeight)
             .animation(
-                .easeInOut(duration: 0.35 + Double(index % 3) * 0.1)
-                .repeatForever(autoreverses: true),
-                value: phase
+                .spring(response: 0.18, dampingFraction: 0.65),
+                value: currentHeight
             )
     }
 }
@@ -73,6 +85,6 @@ private struct WaveBar: View {
 #Preview {
     ZStack {
         TindAITheme.darkNavy.ignoresSafeArea()
-        WaveformView(isRecording: true)
+        WaveformView(isRecording: true, audioLevel: 0.6)
     }
 }

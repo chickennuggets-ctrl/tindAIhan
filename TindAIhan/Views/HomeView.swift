@@ -11,6 +11,8 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \LedgerEntry.createdAt, order: .reverse) private var allEntries: [LedgerEntry]
 
+    @State private var isShowingSettings = false
+    @State private var isShowingOnboarding = false
     @State private var searchText = ""
     @State private var isSearching = false
     @State private var selectedCustomer: String? = nil
@@ -25,7 +27,12 @@ struct HomeView: View {
     }
 
     private var formattedTotalUtang: String {
-        String(format: "₱%.2f", totalUtang)
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let numStr = formatter.string(from: NSNumber(value: totalUtang)) ?? String(format: "%.2f", totalUtang)
+        return "₱\(numStr)"
     }
 
     private var uniqueUnpaidCustomersCount: Int {
@@ -35,7 +42,8 @@ struct HomeView: View {
     private var overdueCount: Int {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: .now)
-        return unpaidEntries.filter { $0.dueDate < today }.count
+        let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: today) ?? today
+        return unpaidEntries.filter { $0.dueDate <= oneWeekAgo }.count
     }
 
     // Group entries by transaction or customer for the list
@@ -59,7 +67,17 @@ struct HomeView: View {
         }
 
         var relativeTime: String {
-            items.first?.relativeTimeString ?? "kanina"
+            guard let date = items.first?.createdAt else { return "kanina" }
+            let cal = Calendar.current
+            if cal.isDateInToday(date) {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "h:mm a"
+                return formatter.string(from: date).lowercased()
+            } else {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "MMMM d"
+                return formatter.string(from: date)
+            }
         }
     }
 
@@ -72,7 +90,7 @@ struct HomeView: View {
 
         // Group by transactionId
         let grouped = Dictionary(grouping: filtered) { $0.transactionId }
-        return grouped.map { id, entries in
+        let allGroups = grouped.map { id, entries in
             let sorted = entries.sorted { $0.createdAt > $1.createdAt }
             let first = sorted.first!
             return TransactionGroup(
@@ -83,6 +101,20 @@ struct HomeView: View {
                 isPaid: entries.allSatisfy(\.isPaid)
             )
         }.sorted { $0.createdAt > $1.createdAt }
+
+        // When not searching, show latest transaction per customer matching Figma Image 2
+        if searchText.isEmpty {
+            var seen = Set<String>()
+            var distinct: [TransactionGroup] = []
+            for g in allGroups {
+                if !seen.contains(g.customer) {
+                    seen.insert(g.customer)
+                    distinct.append(g)
+                }
+            }
+            return distinct
+        }
+        return allGroups
     }
 
     var body: some View {
@@ -93,13 +125,24 @@ struct HomeView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
                     // 1. Header Branding
-                    TindAIhanHeader()
+                    TindAIhanHeader(onSettingsTapped: {
+                        isShowingSettings = true
+                    })
+                    .sheet(isPresented: $isShowingSettings) {
+                        DemoSettingsSheet(
+                            onResetData: { resetToFigmaDemoData() },
+                            onRestartOnboarding: { isShowingOnboarding = true }
+                        )
+                    }
+                    .sheet(isPresented: $isShowingOnboarding) {
+                        OnboardingView(isCompleted: $isShowingOnboarding)
+                    }
 
-                    // 2. Dark Navy Hero Card
+                    // 2. Dark Navy Hero Card matching Figma Image 2
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Kabuuang utang ngayon")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color(red: 148/255, green: 163/255, blue: 184/255))
+                        Text("Total amount of utang today")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color(red: 203/255, green: 213/255, blue: 225/255))
 
                         Text(formattedTotalUtang)
                             .font(.system(size: 38, weight: .heavy, design: .rounded))
@@ -258,6 +301,92 @@ struct HomeView: View {
         )) { item in
             CustomerDetailView(customerName: item.name)
         }
+        .onAppear {
+            if allEntries.contains(where: { $0.customer == "Kurt Paul" }) {
+                resetToFigmaDemoData()
+            }
+        }
+    }
+
+    private func resetToFigmaDemoData() {
+        for entry in allEntries {
+            modelContext.delete(entry)
+        }
+        for sample in LedgerEntry.previewSamples {
+            modelContext.insert(sample)
+        }
+        try? modelContext.save()
+        Haptics.success()
+    }
+}
+
+// MARK: - Hackathon Demo & Settings Sheet
+struct DemoSettingsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    var onResetData: () -> Void
+    var onRestartOnboarding: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Hackathon Demo Controls") {
+                    Button {
+                        onResetData()
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.counterclockwise.circle.fill")
+                                .foregroundStyle(TindAITheme.brandRed)
+                            Text("I-load ang Figma Demo Dataset (₱6,767.67)")
+                                .foregroundStyle(TindAITheme.textPrimary)
+                        }
+                    }
+
+                    Button {
+                        dismiss()
+                        onRestartOnboarding()
+                    } label: {
+                        HStack {
+                            Image(systemName: "sparkles")
+                                .foregroundStyle(TindAITheme.accentYellowDark)
+                            Text("Ulitin ang Onboarding Setup Flow")
+                                .foregroundStyle(TindAITheme.textPrimary)
+                        }
+                    }
+                }
+
+                Section("100% Local AI Engine Status") {
+                    HStack {
+                        Text("Speech-to-Text")
+                        Spacer()
+                        Text("Whisper on-device")
+                            .foregroundStyle(Color(red: 27/255, green: 153/255, blue: 139/255))
+                            .bold()
+                    }
+                    HStack {
+                        Text("Language Parser")
+                        Spacer()
+                        Text("Local LLM / Offline NL Engine")
+                            .foregroundStyle(TindAITheme.brandRed)
+                            .bold()
+                    }
+                    HStack {
+                        Text("Network Dependency")
+                        Spacer()
+                        Text("0% (Airplane Mode Ready)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Mga Setting at Demo")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Isara") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }
 

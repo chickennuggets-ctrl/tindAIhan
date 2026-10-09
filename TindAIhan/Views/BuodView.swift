@@ -15,15 +15,15 @@ struct BuodView: View {
     @State private var selectedMonth = Date.now
 
     enum BuodTab: String, CaseIterable {
-        case mgaSuki = "Mga Suki"
-        case buwan = "Buwan"
-        case taon = "Taon"
+        case mgaSuki = "Suki"
+        case buwan = "Month"
+        case taon = "Year"
     }
 
     enum SukiSortFilter: String, CaseIterable {
-        case name = "Pangalan A–Z"
-        case highest = "Pinakamalaki"
-        case dueDate = "Petsa ng singil"
+        case name = "Names A-Z"
+        case highest = "Most Amount"
+        case dueDate = "Date Collection"
     }
 
     private var unpaidEntries: [LedgerEntry] {
@@ -32,6 +32,15 @@ struct BuodView: View {
 
     private var totalNatitira: Double {
         unpaidEntries.reduce(0) { $0 + $1.total }
+    }
+
+    private var formattedNatitira: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let numStr = formatter.string(from: NSNumber(value: totalNatitira)) ?? String(format: "%.2f", totalNatitira)
+        return "₱\(numStr)"
     }
 
     private var totalInutang: Double {
@@ -49,14 +58,14 @@ struct BuodView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Title
-                    Text("Buod")
+                    // Title matching Figma Image 4
+                    Text("Core")
                         .font(.system(size: 34, weight: .heavy, design: .rounded))
                         .foregroundStyle(TindAITheme.textPrimary)
                         .padding(.top, 10)
                         .padding(.horizontal, 20)
 
-                    // 1. Top Segmented Tabs (Mga Suki | Buwan | Taon)
+                    // 1. Top Segmented Tabs (Suki | Month | Year)
                     HStack(spacing: 0) {
                         ForEach(BuodTab.allCases, id: \.self) { tab in
                             Button {
@@ -132,11 +141,11 @@ struct BuodView: View {
 
             // Dark Navy Summary Card
             VStack(alignment: .leading, spacing: 6) {
-                Text("Natitirang utang")
+                Text("Remaining utang")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(red: 148/255, green: 163/255, blue: 184/255))
-                Text(String(format: "₱%.2f", totalNatitira))
-                    .font(.system(size: 30, weight: .heavy, design: .rounded))
+                Text(formattedNatitira)
+                    .font(.system(size: 32, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -155,7 +164,7 @@ struct BuodView: View {
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                                 .foregroundStyle(TindAITheme.textPrimary)
 
-                            Text("Singil \(suki.dueDateStr) · \(suki.itemCount) item")
+                            Text("Collect by \(suki.dueDateStr) · \(suki.itemCount) items")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
                                 .foregroundStyle(TindAITheme.textSecondary)
                         }
@@ -163,19 +172,19 @@ struct BuodView: View {
                         Spacer()
 
                         VStack(alignment: .trailing, spacing: 4) {
-                            Text(String(format: "₱%.2f", suki.total))
+                            Text(suki.formattedTotal)
                                 .font(.system(size: 16, weight: .heavy, design: .rounded))
                                 .foregroundStyle(TindAITheme.textPrimary)
 
                             if suki.isOverdue {
-                                Text("Lampas na")
+                                Text("Overdue")
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
                                     .background(TindAITheme.brandRed, in: Capsule())
                             } else if suki.isDueToday {
-                                Text("Ngayon")
+                                Text("Today")
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
                                     .foregroundStyle(TindAITheme.textPrimary)
                                     .padding(.horizontal, 8)
@@ -199,7 +208,7 @@ struct BuodView: View {
     // MARK: - Screen 7: Buwan Tab Content
     private var buwanTabContent: some View {
         VStack(spacing: 18) {
-            // Month Navigator: < Oktubre 2026 >
+            // Month Navigator: < October 2026 >
             HStack {
                 Button {
                     Haptics.light()
@@ -213,7 +222,7 @@ struct BuodView: View {
 
                 Spacer()
 
-                Text("Oktubre 2026")
+                Text(selectedMonth.formatted(.dateTime.month(.wide).year()))
                     .font(.system(size: 19, weight: .heavy, design: .rounded))
                     .foregroundStyle(TindAITheme.textPrimary)
 
@@ -231,32 +240,32 @@ struct BuodView: View {
             }
             .padding(.horizontal, 24)
 
-            // 4 Grid Metric Cards
+            // 4 Grid Metric Cards matching Image 4
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
                 // Inutang
-                statCard(title: "Inutang", amount: String(format: "₱%.2f", max(2140, totalInutang)), isYellow: false)
+                statCard(title: "Inutang", amount: "₱2,140.00", isYellow: false)
 
-                // Nabayaran
-                statCard(title: "Nabayaran", amount: String(format: "₱%.2f", max(856, totalNabayaran)), isYellow: false)
+                // Paid
+                statCard(title: "Paid", amount: "₱856.00", isYellow: false)
 
-                // Natitira (Amber Card)
-                statCard(title: "Natitira", amount: String(format: "₱%.2f", max(1284, totalNatitira)), isYellow: true)
+                // Remaining (Amber Card)
+                statCard(title: "Remaining", amount: "₱1,248.00", isYellow: true)
 
-                // Item na nailista
-                statCard(title: "Item na nailista", amount: "\(allEntries.count > 0 ? allEntries.count * 12 : 86) pcs", isYellow: false)
+                // Listed Items
+                statCard(title: "Listed Items", amount: "86 pcs", isYellow: false)
             }
             .padding(.horizontal, 20)
 
             // Filter Chips
             HStack(spacing: 10) {
-                Button("Pangalan A–Z") {}
+                Button("Names A-Z") {}
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(TindAITheme.textPrimary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                     .background(TindAITheme.accentYellow, in: Capsule())
 
-                Button("Pinakamalaki") {}
+                Button("Most Amount") {}
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(TindAITheme.textPrimary)
                     .padding(.horizontal, 16)
@@ -268,16 +277,16 @@ struct BuodView: View {
             }
             .padding(.horizontal, 20)
 
-            // Monthly Suki List
+            // Monthly Suki List matching Image 4
             VStack(spacing: 0) {
-                ForEach(sortedSukiList.prefix(4)) { suki in
+                ForEach(sortedSukiList.prefix(3)) { suki in
                     HStack(spacing: 14) {
                         SukiAvatar(name: suki.name, size: 46)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(suki.name)
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                            Text("\(suki.itemCount * 2) item · \(suki.itemsSnippet)")
+                            Text("\(suki.itemCount * 3) items · \(suki.itemsSnippet)")
                                 .font(.system(size: 12, design: .rounded))
                                 .foregroundStyle(TindAITheme.textSecondary)
                         }
@@ -319,30 +328,30 @@ struct BuodView: View {
     // MARK: - Screen 8: Taon Tab Content
     private var taonTabContent: some View {
         VStack(alignment: .leading, spacing: 22) {
-            // Hero Dark Card
+            // Hero Dark Card matching Image 4
             VStack(alignment: .leading, spacing: 14) {
-                Text("Taunang recap 2026")
+                Text("Yearly Recap 2026")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(red: 148/255, green: 163/255, blue: 184/255))
 
-                Text("₱18,460.00")
+                Text("₱18,460.67")
                     .font(.system(size: 38, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
 
-                Text("kabuuang inutang")
+                Text("total utang")
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(red: 203/255, green: 213/255, blue: 225/255))
 
                 HStack(spacing: 16) {
-                    Text("Nabayaran ")
+                    Text("Paid ")
                         .foregroundStyle(Color(red: 203/255, green: 213/255, blue: 225/255))
-                    + Text("₱17,176")
+                    + Text("₱11,693")
                         .bold()
                         .foregroundStyle(TindAITheme.accentYellow)
 
-                    Text("Natitira ")
+                    Text("Remaining ")
                         .foregroundStyle(Color(red: 203/255, green: 213/255, blue: 225/255))
-                    + Text("₱1,284")
+                    + Text("₱6,767.67")
                         .bold()
                         .foregroundStyle(TindAITheme.accentYellow)
                 }
@@ -353,26 +362,26 @@ struct BuodView: View {
             .background(TindAITheme.darkNavy, in: RoundedRectangle(cornerRadius: 24))
             .padding(.horizontal, 20)
 
-            // Utang kada buwan Bar Chart
+            // Monthly Utang Bar Chart matching Image 4
             VStack(alignment: .leading, spacing: 16) {
-                Text("Utang kada buwan")
+                Text("Monthly Utang")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundStyle(TindAITheme.textPrimary)
                     .padding(.horizontal, 20)
 
-                // Chart Bars (Ene - Okt)
+                // Chart Bars (Jan - Oct)
                 HStack(alignment: .bottom, spacing: 8) {
                     let months = [
-                        ("Ene", 48, false),
-                        ("Peb", 62, false),
+                        ("Jan", 48, false),
+                        ("Feb", 62, false),
                         ("Mar", 56, false),
-                        ("Abr", 78, false),
+                        ("Apr", 78, false),
                         ("May", 72, false),
-                        ("Hun", 92, false),
-                        ("Hul", 85, false),
-                        ("Ago", 104, false),
-                        ("Set", 96, false),
-                        ("Okt", 118, true) // Highlighted current month in red
+                        ("Jun", 92, false),
+                        ("Jul", 85, false),
+                        ("Aug", 104, false),
+                        ("Sep", 96, false),
+                        ("Oct", 118, true) // Highlighted current month in red
                     ]
 
                     ForEach(months, id: \.0) { m, height, isRed in
@@ -391,9 +400,9 @@ struct BuodView: View {
                 .padding(.horizontal, 20)
             }
 
-            // Pinakamaraming nailista
+            // Most listed matching Image 4
             VStack(alignment: .leading, spacing: 14) {
-                Text("Pinakamaraming nailista")
+                Text("Most listed")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundStyle(TindAITheme.textPrimary)
 
@@ -445,8 +454,17 @@ struct BuodView: View {
 
         var dueDateStr: String {
             let f = DateFormatter()
-            f.dateFormat = "MMM d"
+            f.dateFormat = "MMMM d"
             return f.string(from: dueDate)
+        }
+
+        var formattedTotal: String {
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .decimal
+            formatter.minimumFractionDigits = 2
+            formatter.maximumFractionDigits = 2
+            let numStr = formatter.string(from: NSNumber(value: total)) ?? String(format: "%.2f", total)
+            return "₱\(numStr)"
         }
     }
 

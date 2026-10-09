@@ -34,8 +34,7 @@ struct ConfirmEntryView: View {
 
     private var formattedDueDate: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tl_PH")
-        formatter.dateFormat = "MMM d"
+        formatter.dateFormat = "MMMM d"
         let dateStr = formatter.string(from: dueDate)
 
         let calendar = Calendar.current
@@ -52,24 +51,11 @@ struct ConfirmEntryView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        // Title Header
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Tama ba ito?")
+                        // Title Header matching Figma Image 3
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Is this correct?")
                                 .font(.system(size: 32, weight: .heavy, design: .rounded))
                                 .foregroundStyle(TindAITheme.textPrimary)
-
-                            // AI Processing Badge
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color(red: 16/255, green: 185/255, blue: 129/255))
-                                    .frame(width: 7, height: 7)
-                                Text("Na-parse ng AI · 0.8s · walang internet")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(TindAITheme.badgeGreenText)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(TindAITheme.badgeGreenBg, in: Capsule())
                         }
                         .padding(.top, 10)
 
@@ -81,14 +67,14 @@ struct ConfirmEntryView: View {
                                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                                         .foregroundStyle(TindAITheme.textSecondary)
 
-                                    Text(customerName.isEmpty ? "Pangalan ng Customer" : customerName)
+                                    Text(customerName.isEmpty ? "Customer Name" : customerName)
                                         .font(.system(size: 22, weight: .bold, design: .rounded))
                                         .foregroundStyle(TindAITheme.textPrimary)
                                 }
 
                                 Spacer()
 
-                                Button("Baguhin") {
+                                Button("Change") {
                                     Haptics.light()
                                     isEditingCustomer = true
                                 }
@@ -109,7 +95,7 @@ struct ConfirmEntryView: View {
                                             .font(.system(size: 17, weight: .bold, design: .rounded))
                                             .foregroundStyle(TindAITheme.textPrimary)
 
-                                        Text(String(format: "₱%.0f bawat isa", item.unitPrice))
+                                        Text(String(format: "₱%.2f each", item.unitPrice))
                                             .font(.system(size: 13, weight: .medium, design: .rounded))
                                             .foregroundStyle(TindAITheme.textSecondary)
                                     }
@@ -169,7 +155,7 @@ struct ConfirmEntryView: View {
                                 isAddingItem = true
                             } label: {
                                 HStack {
-                                    Text("+ Magdagdag ng item")
+                                    Text("+ Add more items")
                                         .font(.system(size: 15, weight: .bold, design: .rounded))
                                         .foregroundStyle(TindAITheme.brandRed)
                                     Spacer()
@@ -181,10 +167,10 @@ struct ConfirmEntryView: View {
                         .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
                         .shadow(color: Color.black.opacity(0.03), radius: 8, y: 3)
 
-                        // 3. Due Date Card (Petsa ng Singil)
+                        // 3. Due Date Card (Collection Date)
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Petsa ng singil")
+                                Text("Collection Date")
                                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                                     .foregroundStyle(TindAITheme.textSecondary)
 
@@ -195,7 +181,7 @@ struct ConfirmEntryView: View {
 
                             Spacer()
 
-                            Button("Baguhin") {
+                            Button("Change") {
                                 Haptics.light()
                                 isPickingDueDate = true
                             }
@@ -206,9 +192,9 @@ struct ConfirmEntryView: View {
                         .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
                         .shadow(color: Color.black.opacity(0.03), radius: 8, y: 3)
 
-                        // 4. Hero Total Card (Kabuuan)
+                        // 4. Hero Total Card (Total)
                         HStack {
-                            Text("Kabuuan")
+                            Text("Total")
                                 .font(.system(size: 20, weight: .heavy, design: .rounded))
                                 .foregroundStyle(TindAITheme.textPrimary)
 
@@ -224,12 +210,12 @@ struct ConfirmEntryView: View {
                         .background(TindAITheme.accentYellow, in: RoundedRectangle(cornerRadius: 20))
                         .shadow(color: TindAITheme.accentYellow.opacity(0.3), radius: 10, y: 4)
 
-                        // Bottom Action Buttons
+                        // Bottom Action Buttons matching Figma Image 3
                         VStack(spacing: 14) {
                             Button {
                                 saveToLedger()
                             } label: {
-                                Text("I-save sa listahan")
+                                Text("Save list")
                                     .font(.system(size: 18, weight: .bold, design: .rounded))
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity)
@@ -244,8 +230,8 @@ struct ConfirmEntryView: View {
                                 dismiss()
                                 onRerecord()
                             } label: {
-                                Text("Ulitin ang recording")
-                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                Text("Record again")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
                                     .foregroundStyle(TindAITheme.textPrimary)
                                     .padding(.vertical, 6)
                             }

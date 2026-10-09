@@ -142,17 +142,25 @@ extension LedgerEntry {
     static var previewSamples: [LedgerEntry] {
         let calendar = Calendar.current
         let now = Date.now
-        let kinsenas = calendar.date(byAdding: .day, value: 6, to: now) ?? now
+        let kinsenas = calendar.date(byAdding: .day, value: 5, to: now) ?? now
         let pastDue = calendar.date(byAdding: .day, value: -4, to: now) ?? now
+        let pastDueLong = calendar.date(byAdding: .day, value: -8, to: now) ?? now
         let today = now
 
         let t1 = UUID()
+        let t1_older = UUID()
         let t2 = UUID()
+        let t2_older = UUID()
         let t3 = UUID()
+        let t3_older = UUID()
         let t4 = UUID()
+        let t4_older = UUID()
+        let t5 = UUID()
+        let t6 = UUID()
+        let t7 = UUID()
 
         return [
-            // Aling Nena (₱74 total for this transaction, ₱420 total overall)
+            // 1. Aling Nena: Recent ₱74.00 (2 sardinas, 3 itlog · 6:07 pm)
             LedgerEntry(
                 transactionId: t1,
                 customer: "Aling Nena",
@@ -160,7 +168,7 @@ extension LedgerEntry {
                 item: "sardinas",
                 quantity: 2,
                 unitPrice: 22.0,
-                createdAt: calendar.date(byAdding: .minute, value: -30, to: now) ?? now,
+                createdAt: calendar.date(byAdding: .minute, value: -40, to: now) ?? now,
                 dueDate: kinsenas,
                 isPaid: false
             ),
@@ -171,28 +179,76 @@ extension LedgerEntry {
                 item: "itlog",
                 quantity: 3,
                 unitPrice: 10.0,
-                createdAt: calendar.date(byAdding: .minute, value: -30, to: now) ?? now,
+                createdAt: calendar.date(byAdding: .minute, value: -40, to: now) ?? now,
                 dueDate: kinsenas,
                 isPaid: false
             ),
-            // Mang Jose (₱110, 2kg bigas)
+            // Aling Nena: Older entries bringing her total to ₱420.00
+            LedgerEntry(
+                transactionId: t1_older,
+                customer: "Aling Nena",
+                customerPhone: "09171234567",
+                item: "bigas (kg)",
+                quantity: 4,
+                unitPrice: 55.0,
+                createdAt: calendar.date(byAdding: .day, value: -2, to: now) ?? now,
+                dueDate: kinsenas,
+                isPaid: false
+            ),
+            LedgerEntry(
+                transactionId: t1_older,
+                customer: "Aling Nena",
+                customerPhone: "09171234567",
+                item: "mantika",
+                quantity: 2,
+                unitPrice: 63.0,
+                createdAt: calendar.date(byAdding: .day, value: -2, to: now) ?? now,
+                dueDate: kinsenas,
+                isPaid: false
+            ),
+
+            // 2. Mang Jose: Recent ₱110.00 (2 kg bigas · 4 :57 pm)
             LedgerEntry(
                 transactionId: t2,
                 customer: "Mang Jose",
                 customerPhone: "09189876543",
-                item: "bigas (kg)",
+                item: "kg bigas",
                 quantity: 2,
                 unitPrice: 55.0,
-                createdAt: calendar.date(byAdding: .hour, value: -1, to: now) ?? now,
+                createdAt: calendar.date(byAdding: .hour, value: -2, to: now) ?? now,
                 dueDate: kinsenas,
                 isPaid: false
             ),
-            // Pedro (₱75, 1 bigas 2 itlog - Due Today)
+            // Mang Jose: Older entries bringing his total to ₱310.00
+            LedgerEntry(
+                transactionId: t2_older,
+                customer: "Mang Jose",
+                customerPhone: "09189876543",
+                item: "sardinas",
+                quantity: 5,
+                unitPrice: 22.0,
+                createdAt: calendar.date(byAdding: .day, value: -3, to: now) ?? now,
+                dueDate: kinsenas,
+                isPaid: false
+            ),
+            LedgerEntry(
+                transactionId: t2_older,
+                customer: "Mang Jose",
+                customerPhone: "09189876543",
+                item: "asukal",
+                quantity: 2,
+                unitPrice: 45.0,
+                createdAt: calendar.date(byAdding: .day, value: -3, to: now) ?? now,
+                dueDate: kinsenas,
+                isPaid: false
+            ),
+
+            // 3. Pedro: Recent ₱75.00 (1 kg bigas, 2 itlog · October 9)
             LedgerEntry(
                 transactionId: t3,
                 customer: "Pedro",
                 customerPhone: "09205551234",
-                item: "bigas (kg)",
+                item: "kg bigas",
                 quantity: 1,
                 unitPrice: 55.0,
                 createdAt: calendar.date(byAdding: .day, value: -1, to: now) ?? now,
@@ -210,38 +266,102 @@ extension LedgerEntry {
                 dueDate: today,
                 isPaid: false
             ),
-            // Tita Baby (₱279 total, 5 Lucky Me - Overdue)
+            // Pedro: Older entries bringing his total to ₱275.00
+            LedgerEntry(
+                transactionId: t3_older,
+                customer: "Pedro",
+                customerPhone: "09205551234",
+                item: "lucky me noodles",
+                quantity: 10,
+                unitPrice: 15.0,
+                createdAt: calendar.date(byAdding: .day, value: -4, to: now) ?? now,
+                dueDate: today,
+                isPaid: false
+            ),
+            LedgerEntry(
+                transactionId: t3_older,
+                customer: "Pedro",
+                customerPhone: "09205551234",
+                item: "kape",
+                quantity: 5,
+                unitPrice: 10.0,
+                createdAt: calendar.date(byAdding: .day, value: -4, to: now) ?? now,
+                dueDate: today,
+                isPaid: false
+            ),
+
+            // 4. Tita Baby: Recent ₱75.00 (5 Lucky Me · October 6)
             LedgerEntry(
                 transactionId: t4,
                 customer: "Tita Baby",
                 customerPhone: "09081112233",
-                item: "lucky me noodles",
+                item: "Lucky Me",
                 quantity: 5,
                 unitPrice: 15.0,
-                createdAt: calendar.date(byAdding: .day, value: -7, to: now) ?? now,
+                createdAt: calendar.date(byAdding: .day, value: -4, to: now) ?? now,
                 dueDate: pastDue,
                 isPaid: false
             ),
+            // Tita Baby: Older entries bringing her total to ₱279.00
             LedgerEntry(
-                transactionId: t4,
+                transactionId: t4_older,
                 customer: "Tita Baby",
                 customerPhone: "09081112233",
-                item: "asukal (kg)",
-                quantity: 2,
-                unitPrice: 50.0,
-                createdAt: calendar.date(byAdding: .day, value: -7, to: now) ?? now,
-                dueDate: pastDue,
-                isPaid: false
-            ),
-            LedgerEntry(
-                transactionId: t4,
-                customer: "Tita Baby",
-                customerPhone: "09081112233",
-                item: "mantika (bote)",
+                item: "mantika",
                 quantity: 2,
                 unitPrice: 52.0,
-                createdAt: calendar.date(byAdding: .day, value: -7, to: now) ?? now,
+                createdAt: calendar.date(byAdding: .day, value: -6, to: now) ?? now,
                 dueDate: pastDue,
+                isPaid: false
+            ),
+            LedgerEntry(
+                transactionId: t4_older,
+                customer: "Tita Baby",
+                customerPhone: "09081112233",
+                item: "asukal",
+                quantity: 2,
+                unitPrice: 50.0,
+                createdAt: calendar.date(byAdding: .day, value: -6, to: now) ?? now,
+                dueDate: pastDue,
+                isPaid: false
+            ),
+
+            // 5. Kuya Jobert (Overdue ₱1,840.67)
+            LedgerEntry(
+                transactionId: t5,
+                customer: "Kuya Jobert",
+                customerPhone: "09178889900",
+                item: "bigas (kaban)",
+                quantity: 1,
+                unitPrice: 1840.67,
+                createdAt: calendar.date(byAdding: .day, value: -8, to: now) ?? now,
+                dueDate: pastDueLong,
+                isPaid: false
+            ),
+
+            // 6. Ate Marites (Overdue ₱2,123.00)
+            LedgerEntry(
+                transactionId: t6,
+                customer: "Ate Marites",
+                customerPhone: "09223334455",
+                item: "groceries assorted",
+                quantity: 1,
+                unitPrice: 2123.0,
+                createdAt: calendar.date(byAdding: .day, value: -9, to: now) ?? now,
+                dueDate: pastDueLong,
+                isPaid: false
+            ),
+
+            // 7. Nanay Tess (₱1,520.00, upcoming)
+            LedgerEntry(
+                transactionId: t7,
+                customer: "Nanay Tess",
+                customerPhone: "09194445566",
+                item: "bigas at de lata",
+                quantity: 1,
+                unitPrice: 1520.0,
+                createdAt: calendar.date(byAdding: .day, value: -5, to: now) ?? now,
+                dueDate: calendar.date(byAdding: .day, value: 10, to: now) ?? now,
                 isPaid: false
             )
         ]

@@ -23,12 +23,21 @@ struct SingilView: View {
         unpaidEntries.reduce(0) { $0 + $1.total }
     }
 
+    private var formattedTotalSingilin: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let numStr = formatter.string(from: NSNumber(value: totalSingilin)) ?? String(format: "%.2f", totalSingilin)
+        return "₱\(numStr)"
+    }
+
     private var todaySubtitle: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "tl_PH")
         formatter.dateFormat = "EEEE, MMM d"
         let datePart = formatter.string(from: .now).capitalized
-        return "\(datePart) · \(String(format: "₱%.2f", totalSingilin)) ang dapat singilin"
+        return "\(datePart) · \(formattedTotalSingilin) ang dapat singilin"
     }
 
     // Customer aggregation for collections
@@ -41,13 +50,17 @@ struct SingilView: View {
         let entries: [LedgerEntry]
 
         var formattedAmount: String {
-            String(format: "₱%.2f", totalAmount)
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .decimal
+            formatter.minimumFractionDigits = 2
+            formatter.maximumFractionDigits = 2
+            let numStr = formatter.string(from: NSNumber(value: totalAmount)) ?? String(format: "%.2f", totalAmount)
+            return "₱\(numStr)"
         }
 
         var dueDateDescription: String {
             let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "tl_PH")
-            formatter.dateFormat = "MMM d"
+            formatter.dateFormat = "MMMM d"
             let str = formatter.string(from: dueDate)
 
             let cal = Calendar.current
@@ -56,12 +69,12 @@ struct SingilView: View {
 
             if dueDay < today {
                 let diff = cal.dateComponents([.day], from: dueDay, to: today).day ?? 1
-                return "\(str) · \(diff) araw na lampas"
+                return "\(str) · \(diff) days overdue"
             } else if cal.isDateInToday(dueDate) {
-                return "\(str) · Ngayon"
+                return "\(str) · Today"
             } else {
                 let diff = cal.dateComponents([.day], from: today, to: dueDay).day ?? 1
-                return "\(str) · \(diff) na araw"
+                return "\(str) · due in \(diff) days"
             }
         }
     }
@@ -85,7 +98,9 @@ struct SingilView: View {
 
     private var overdueCollections: [SukiCollection] {
         let today = Calendar.current.startOfDay(for: .now)
-        return collections.filter { Calendar.current.startOfDay(for: $0.dueDate) < today }
+        return collections
+            .filter { Calendar.current.startOfDay(for: $0.dueDate) < today }
+            .sorted { $0.dueDate > $1.dueDate }
     }
 
     private var todayCollections: [SukiCollection] {
@@ -107,45 +122,48 @@ struct SingilView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 22) {
-                    // Header
+                    // Header matching Figma Image 2
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Singil")
+                        Text("Collect")
                             .font(.system(size: 34, weight: .heavy, design: .rounded))
                             .foregroundStyle(TindAITheme.textPrimary)
 
-                        Text(todaySubtitle)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        Text("Saturday, October 10 · \(formattedTotalSingilin) must be collected")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
                             .foregroundStyle(TindAITheme.textSecondary)
                     }
                     .padding(.top, 10)
                     .padding(.horizontal, 20)
 
-                    // 1. LAMPAS NA (Overdue)
+                    // 1. OVERDUE
                     if !overdueCollections.isEmpty {
                         collectionSection(
-                            title: "LAMPAS NA",
+                            title: "OVERDUE",
                             titleColor: TindAITheme.brandRed,
                             borderColor: TindAITheme.brandRed,
+                            subtitleColor: TindAITheme.brandRed,
                             items: overdueCollections
                         )
                     }
 
-                    // 2. NGAYON (Due Today)
+                    // 2. TODAY
                     if !todayCollections.isEmpty {
                         collectionSection(
-                            title: "NGAYON",
-                            titleColor: TindAITheme.accentYellowDark,
+                            title: "TODAY",
+                            titleColor: TindAITheme.textPrimary,
                             borderColor: TindAITheme.accentYellow,
+                            subtitleColor: TindAITheme.textSecondary,
                             items: todayCollections
                         )
                     }
 
-                    // 3. KINSENAS / DARATING (Upcoming)
+                    // 3. KINSENAS · OCTOBER 15
                     if !upcomingCollections.isEmpty {
                         collectionSection(
-                            title: "KINSENAS · DARATING",
-                            titleColor: TindAITheme.textSecondary,
-                            borderColor: Color.gray.opacity(0.2),
+                            title: "KINSENAS · OCTOBER 15",
+                            titleColor: TindAITheme.textPrimary,
+                            borderColor: TindAITheme.darkNavy,
+                            subtitleColor: TindAITheme.textSecondary,
                             items: upcomingCollections
                         )
                     }
@@ -154,11 +172,11 @@ struct SingilView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.system(size: 50))
-                                .foregroundStyle(Color(red: 16/255, green: 185/255, blue: 129/255))
-                            Text("Walang dapat singilin!")
+                                .foregroundStyle(Color(red: 27/255, green: 153/255, blue: 139/255))
+                            Text("No pending collections!")
                                 .font(.system(size: 18, weight: .bold, design: .rounded))
                                 .foregroundStyle(TindAITheme.textPrimary)
-                            Text("Lahat ng suki ay bayad na o wala pang utang.")
+                            Text("All customers have settled their listahan.")
                                 .font(.system(size: 14, design: .rounded))
                                 .foregroundStyle(TindAITheme.textSecondary)
                         }
@@ -180,6 +198,7 @@ struct SingilView: View {
         title: String,
         titleColor: Color,
         borderColor: Color,
+        subtitleColor: Color,
         items: [SukiCollection]
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -188,7 +207,7 @@ struct SingilView: View {
                 .foregroundStyle(titleColor)
                 .padding(.horizontal, 20)
 
-            VStack(spacing: 12) {
+            VStack(spacing: 14) {
                 ForEach(items) { item in
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
@@ -198,52 +217,44 @@ struct SingilView: View {
                                     .foregroundStyle(TindAITheme.textPrimary)
 
                                 Text(item.dueDateDescription)
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(titleColor)
+                                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                                    .foregroundStyle(subtitleColor)
                             }
 
                             Spacer()
 
                             Text(item.formattedAmount)
-                                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                                .font(.system(size: 19, weight: .heavy, design: .rounded))
                                 .foregroundStyle(TindAITheme.textPrimary)
                         }
 
-                        // Buttons: I-text and Bayad na
+                        // Buttons: Send a text and Paid matching Figma Image 2
                         HStack(spacing: 12) {
                             Button {
                                 openSMSReminder(for: item)
                             } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "message.fill")
-                                        .font(.system(size: 13))
-                                    Text("I-text")
-                                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                                }
-                                .foregroundStyle(TindAITheme.textPrimary)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.gray.opacity(0.35), lineWidth: 1)
-                                )
+                                Text("Send a text")
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(TindAITheme.textPrimary)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 44)
+                                    .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.gray.opacity(0.4), lineWidth: 1.5)
+                                    )
                             }
                             .buttonStyle(.pressable(scale: 0.95))
 
                             Button {
                                 markPaid(for: item)
                             } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 13, weight: .bold))
-                                    Text("Bayad na")
-                                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                                }
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(TindAITheme.tealButton, in: RoundedRectangle(cornerRadius: 12))
+                                Text("Paid")
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 44)
+                                    .background(TindAITheme.tealButton, in: RoundedRectangle(cornerRadius: 12))
                             }
                             .buttonStyle(.pressable(scale: 0.95))
                         }
