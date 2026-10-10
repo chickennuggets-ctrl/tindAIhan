@@ -116,9 +116,15 @@ final class LLMParser {
         let lower = text.lowercased()
 
         let namePrefixes = [
+            // Tagalog
             "pabili po para kay ", "pabili kay ", "lista kay ", "lista ni ",
             "utang ni ", "utang kay ", "palista kay ", "palista ni ",
-            "para kay ", "kay ", "ni "
+            "para kay ", "kay ", "ni ",
+            // English
+            "credit for ", "credit to ", "credit of ",
+            "debt of ", "debt for ", "charge to ",
+            "put on tab for ", "tab for ", "tab of ",
+            "list for ", "utang of ", "utang for ", "for "
         ]
 
         var foundPrefixRange: Range<String.Index>?
@@ -162,9 +168,9 @@ final class LLMParser {
             }
         }
 
-        // Check if starts with Filipino honorifics: Aling, Mang, Kuya, Ate, Tita, Tito, Nanay, Tatay, Ka, Lola, Lolo
+        // Check if starts with Filipino honorifics: Aling, Mang, Kuya, Ate, Tita, Tito, Nanay, Tatay, Ka, Lola, Lolo, Mr, Mrs
         if customerName == "Suki" {
-            let honorifics = ["aling ", "mang ", "kuya ", "ate ", "tita ", "tito ", "nanay ", "tatay ", "ka ", "lola ", "lolo "]
+            let honorifics = ["aling ", "mang ", "kuya ", "ate ", "tita ", "tito ", "nanay ", "tatay ", "ka ", "lola ", "lolo ", "mr. ", "mr ", "mrs. ", "mrs "]
             for h in honorifics {
                 if text.lowercased().hasPrefix(h) {
                     let words = text.split(separator: " ").map(String.init)
@@ -187,7 +193,7 @@ final class LLMParser {
             }
         }
 
-        // Check if leading word is a customer name before the first quantity word (e.g. "Pedro 2 itlog")
+        // Check if leading word is a customer name before the first quantity word (e.g. "Pedro 2 itlog" or "Pedro 2 eggs")
         if customerName == "Suki" {
             let words = text.split(separator: " ").map(String.init)
             if words.count >= 2 {
@@ -200,9 +206,9 @@ final class LLMParser {
             }
         }
 
-        // Check trailing name (e.g. "2 itlog tsaka 1 bigas ni Aling Nena")
+        // Check trailing name (e.g. "2 itlog tsaka 1 bigas ni Aling Nena" or "two eggs and one rice for John")
         if customerName == "Suki" {
-            for suffix in [" para kay ", " kay ", " ni "] {
+            for suffix in [" para kay ", " kay ", " ni ", " for ", " credit to ", " debt of "] {
                 if let r = text.lowercased().range(of: suffix, options: .backwards) {
                     let candidate = text[r.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
                     let words = candidate.split(separator: " ")
@@ -217,12 +223,24 @@ final class LLMParser {
 
         // 2. Parse Items and Quantities
         var cleanedItems = text
-        for conj in [" tsaka ", " saka ", " at saka ", " at ", " and ", " + "] {
+        for conj in [" tsaka ", " saka ", " at saka ", " at ", " and ", " plus ", " + ", " & ", " with "] {
             cleanedItems = cleanedItems.replacingOccurrences(of: conj, with: ", ", options: .caseInsensitive)
         }
 
         let itemSegments = cleanedItems.components(separatedBy: ",")
         var lines: [ParsedUtang.Line] = []
+
+        let unitCounters = [
+            "na", "ng", "piraso", "pirasong", "kilo", "kilong", "kilos", "kg", "kgs",
+            "pack", "packs", "can", "cans", "lata", "latang", "bote", "boteng",
+            "balot", "sachet", "sachets", "kaban", "piece", "pieces", "pcs", "pc",
+            "bottle", "bottles", "box", "boxes", "bar", "bars", "bag", "bags"
+        ]
+
+        let fillerWords = [
+            "ng", "muna", "paki", "pakilista", "po", "daw", "raw", "tsaka", "saka", "at",
+            "naman", "nga", "pala", "please", "of", "and", "also", "the", "a", "an"
+        ]
 
         for seg in itemSegments {
             let trimmed = seg.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -241,11 +259,11 @@ final class LLMParser {
                     qty = num
                     if i + 1 < words.count {
                         let nextWord = words[i + 1].lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ",.-"))
-                        if ["na", "ng", "piraso", "pirasong", "kilo", "kilong", "kilos", "kg", "pack", "packs", "can", "cans", "lata", "latang", "bote", "boteng", "balot", "sachet", "sachets", "kaban"].contains(nextWord) {
+                        if unitCounters.contains(nextWord) {
                             i += 1
                         }
                     }
-                } else if !["ng", "muna", "paki", "pakilista", "po", "daw", "raw", "tsaka", "saka", "at", "naman", "nga", "pala"].contains(lowerWord) {
+                } else if !fillerWords.contains(lowerWord) {
                     itemTokens.append(word)
                 }
                 i += 1
@@ -271,6 +289,7 @@ final class LLMParser {
     private static func parseQuantity(_ word: String) -> Int? {
         if let direct = Int(word) { return direct }
         switch word {
+        // Tagalog / Spanish
         case "isa", "isang", "uno": return 1
         case "dalawa", "dalawang", "dos": return 2
         case "tatlo", "tatlong", "tres": return 3
@@ -291,6 +310,28 @@ final class LLMParser {
         case "apatnapu", "kwarenta": return 40
         case "limampu", "singkwenta": return 50
         case "daan", "isang daan", "sandaan": return 100
+
+        // English
+        case "one", "single": return 1
+        case "two", "pair": return 2
+        case "three": return 3
+        case "four": return 4
+        case "five": return 5
+        case "six": return 6
+        case "seven": return 7
+        case "eight": return 8
+        case "nine": return 9
+        case "ten": return 10
+        case "eleven": return 11
+        case "twelve", "dozen": return 12
+        case "thirteen": return 13
+        case "fourteen": return 14
+        case "fifteen": return 15
+        case "twenty": return 20
+        case "thirty": return 30
+        case "forty": return 40
+        case "fifty": return 50
+        case "hundred", "one hundred": return 100
         default: return nil
         }
     }

@@ -212,6 +212,7 @@ struct SingilView: View {
                         .frame(height: 120)
                 }
             }
+            .scrollBounceBehavior(.always)
         }
         .sheet(isPresented: $showingSMSAlert) {
             smsComposerSheet
@@ -399,11 +400,6 @@ struct SingilView: View {
                 entry.paidAt = .now
             }
             try? modelContext.save()
-            // Voice announcement of payment
-            TextToSpeechService.shared.speakPaymentReceived(
-                customer: collection.customer,
-                amount: collection.totalAmount
-            )
         }
     }
 

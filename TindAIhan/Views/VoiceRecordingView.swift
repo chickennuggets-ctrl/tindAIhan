@@ -4,17 +4,31 @@
 //
 //  Created for AppBuildersPH Hackathon 2026.
 //  Fullscreen voice recording modal matching Figma wireframe 2 (Voice Recording).
-//  Supports true real-time streaming speech recognition, live mic audio level metering,
-//  text-to-speech audition, and instant manual dictation fallback.
+//  Seamlessly transitions directly to the Confirmation Log (ConfirmEntryView)
+//  so the user can review/edit the customer name and utang items and save it to the listahan.
 //
 
 import SwiftUI
+
+enum VoiceFlowStep {
+    case recording
+    case confirming
+}
 
 /// Fullscreen voice recording modal matching wireframe 2 (Voice Recording)
 struct VoiceRecordingView: View {
     @Binding var isPresented: Bool
     var llm: LLMParser
-    var onParsed: (ParsedUtang) -> Void
+    var onSaved: (() -> Void)? = nil
+
+    @State private var step: VoiceFlowStep = .recording
+    @State private var parsedUtang: ParsedUtang = ParsedUtang(
+        name: "Pedro",
+        items: [
+            ParsedUtang.Line(item: "itlog", qty: 2),
+            ParsedUtang.Line(item: "bigas", qty: 1)
+        ]
+    )
 
     @State private var speechRecognizer = LiveSpeechRecognizer()
     @State private var showCursor = true
@@ -22,15 +36,45 @@ struct VoiceRecordingView: View {
     @State private var pulseScale: CGFloat = 1.0
     @State private var isEditingTranscript = false
 
-    // Sample quick-tap phrases for instant testing & audition
+    // Sample quick-tap phrases for instant testing (Tagalog & English)
     private let samplePhrases = [
-        "Utang ni Aling Nena, dalawang sardinas tsaka tatlong itlog",
-        "Mang Jose, dalawang kilo bigas",
-        "Pedro, isang mantika tsaka dalawang kape",
-        "Tita Baby, limang Lucky Me noodles"
+        "Utang ni Pedro, 2 itlog tsaka 1 bigas",
+        "Pedro, 2 eggs and 1 rice",
+        "Utang ni Aling Nena, 2 sardinas tsaka 3 itlog",
+        "Credit of John, 3 sardines and 2 bread",
+        "Mang Jose, 2 kilo bigas",
+        "Tita Baby, 5 Lucky Me noodles"
     ]
 
     var body: some View {
+        Group {
+            if step == .recording {
+                recordingViewContent
+                    .transition(.opacity)
+            } else {
+                ConfirmEntryView(
+                    parsed: parsedUtang,
+                    onSaveComplete: {
+                        isPresented = false
+                        onSaved?()
+                    },
+                    onRerecord: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            step = .recording
+                            startLiveRecordingSession()
+                        }
+                    }
+                )
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.96)),
+                    removal: .opacity
+                ))
+            }
+        }
+    }
+
+    // MARK: - Recording View Content
+    private var recordingViewContent: some View {
         ZStack {
             TindAITheme.darkNavy
                 .ignoresSafeArea()
@@ -152,10 +196,10 @@ struct VoiceRecordingView: View {
                 .background(TindAITheme.cardNavyLight, in: RoundedRectangle(cornerRadius: 20))
                 .padding(.horizontal, 24)
 
-                // 5. Quick Test Suggestions (Speaks aloud via TTS & populates)
+                // 5. Quick Test Suggestions (Tap to populate live transcript)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("💡 O pumili ng halimbawa para pakinggan at subukan:")
+                        Text("💡 O pumili ng halimbawa para masubukan:")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.6))
                         Spacer()
@@ -168,10 +212,9 @@ struct VoiceRecordingView: View {
                                 Button {
                                     Haptics.light()
                                     speechRecognizer.setSampleTranscript(phrase)
-                                    TextToSpeechService.shared.speak(phrase)
                                 } label: {
                                     HStack(spacing: 6) {
-                                        Image(systemName: "speaker.wave.2.fill")
+                                        Image(systemName: "mic.fill")
                                             .font(.system(size: 11))
                                         Text(phrase)
                                             .font(.system(size: 13, weight: .medium, design: .rounded))
@@ -196,7 +239,7 @@ struct VoiceRecordingView: View {
 
                 Spacer()
 
-                // 6. Bottom Pulsing Stop Button matching Wireframe 2
+                // 6. Bottom Pulsing Stop / Process Button
                 VStack(spacing: 12) {
                     ZStack {
                         // Pulsing outer ripple halo
@@ -231,9 +274,9 @@ struct VoiceRecordingView: View {
                         .disabled(isProcessing)
                     }
 
-                    Text("Tap to Stop")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.85))
+                    Text("Tap to Stop & View Log")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.9))
                 }
                 .padding(.bottom, 36)
             }
@@ -279,17 +322,17 @@ struct VoiceRecordingView: View {
             } else if let fallback = try? LLMParser.heuristicParse(utterance) {
                 parsedResult = fallback
             } else {
-                parsedResult = ParsedUtang(name: "Aling Nena", items: [
-                    ParsedUtang.Line(item: "sardinas", qty: 2),
-                    ParsedUtang.Line(item: "itlog", qty: 3)
+                parsedResult = ParsedUtang(name: "Pedro", items: [
+                    ParsedUtang.Line(item: "itlog", qty: 2),
+                    ParsedUtang.Line(item: "bigas", qty: 1)
                 ])
             }
 
             await MainActor.run {
-                isProcessing = false
-                isPresented = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    onParsed(parsedResult)
+                self.parsedUtang = parsedResult
+                self.isProcessing = false
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    self.step = .confirming
                 }
             }
         }
@@ -312,5 +355,5 @@ struct VoiceRecordingView: View {
     VoiceRecordingView(
         isPresented: .constant(true),
         llm: LLMParser()
-    ) { _ in }
+    )
 }

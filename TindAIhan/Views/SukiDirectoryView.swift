@@ -148,6 +148,7 @@ struct SukiDirectoryView: View {
                         .frame(height: 100)
                 }
             }
+            .scrollBounceBehavior(.always)
         }
         .sheet(item: Binding(
             get: { selectedSuki.map { CustomerDetailSheetItem(name: $0) } },

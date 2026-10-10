@@ -136,18 +136,6 @@ struct HomeView: View {
                             speakHomeSummary()
                         }
                     )
-                    .sheet(isPresented: $isShowingSettings) {
-                        DemoSettingsSheet(
-                            onResetData: { resetToFigmaDemoData() },
-                            onRestartOnboarding: { isShowingOnboarding = true }
-                        )
-                    }
-                    .fullScreenCover(isPresented: $isShowingOnboarding) {
-                        OnboardingView(isCompleted: Binding(
-                            get: { !isShowingOnboarding },
-                            set: { if $0 { isShowingOnboarding = false } }
-                        ))
-                    }
 
                     // 2. Dark Navy Hero Card matching Figma Image 2
                     VStack(alignment: .leading, spacing: 14) {
@@ -398,6 +386,13 @@ struct HomeView: View {
                 }
                 .padding(.bottom, 20)
             }
+            .scrollBounceBehavior(.always)
+        }
+        .sheet(isPresented: $isShowingSettings) {
+            DemoSettingsSheet(
+                onResetData: { resetToFigmaDemoData() },
+                onRestartOnboarding: { isShowingOnboarding = true }
+            )
         }
         .sheet(item: Binding(
             get: { selectedCustomer.map { CustomerDetailSheetItem(name: $0) } },
@@ -443,7 +438,6 @@ struct HomeView: View {
                 entry.paidAt = .now
             }
             try? modelContext.save()
-            TextToSpeechService.shared.speakPaymentReceived(customer: group.customer, amount: group.total)
         }
     }
 }

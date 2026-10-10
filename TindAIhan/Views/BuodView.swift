@@ -104,6 +104,7 @@ struct BuodView: View {
                         .frame(height: 100)
                 }
             }
+            .scrollBounceBehavior(.always)
         }
     }
 

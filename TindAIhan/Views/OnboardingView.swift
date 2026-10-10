@@ -122,9 +122,6 @@ struct OnboardingView: View {
             withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
                 floatOffset = -8
             }
-            TextToSpeechService.shared.speakTagalog(
-                "Maligayang pagdating sa TindAIhan! Ang iyong offline voice listahan para sa sari-sari store."
-            )
         }
     }
 
@@ -189,9 +186,6 @@ struct OnboardingView: View {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.65)) {
                 isPabiliPoPulsing = true
             }
-            TextToSpeechService.shared.speakTagalog(
-                "Pabili po! Sabihin lang ang utang, kami na ang bahalang maglista offline nang walang internet."
-            )
         }
     }
 
@@ -313,9 +307,6 @@ struct OnboardingView: View {
                 // "You’re all set!" Button
                 Button {
                     Haptics.success()
-                    TextToSpeechService.shared.speakTagalog(
-                        "Handa na ang iyong tindahan! Pindutin ang mikropono para maglista ng utang."
-                    )
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         isCompleted = true
                         dismiss()

@@ -54,7 +54,7 @@ struct DashboardView: View {
     }
 
     private var mainDashboardContent: some View {
-        ZStack(alignment: .bottom) {
+        VStack(spacing: 0) {
             // Main Content Area
             Group {
                 switch selectedTab {
@@ -70,29 +70,14 @@ struct DashboardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Custom Floating Bottom Navigation Bar matching wireframes
+            // Custom Bottom Navigation Bar anchored flush to the screen bottom
             customBottomBar
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .ignoresSafeArea(edges: .bottom)
         .fullScreenCover(isPresented: $isShowingVoiceModal) {
             VoiceRecordingView(
                 isPresented: $isShowingVoiceModal,
                 llm: llm
-            ) { parsed in
-                self.pendingParsedUtang = parsed
-            }
-        }
-        .sheet(item: $pendingParsedUtang) { pending in
-            ConfirmEntryView(
-                parsed: pending,
-                onSaveComplete: {
-                    pendingParsedUtang = nil
-                    Haptics.success()
-                },
-                onRerecord: {
-                    pendingParsedUtang = nil
-                    isShowingVoiceModal = true
-                }
             )
         }
         .sheet(isPresented: $isShowingManualType) {
@@ -100,10 +85,15 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Custom Floating Bottom Bar matching Figma
+    // MARK: - Custom Bottom Bar Anchored to Screen Bottom matching Figma
     private var customBottomBar: some View {
         ZStack(alignment: .top) {
-            // White Background Bar with subtle shadow
+            // Solid White Bar extending all the way to the physical bottom edge
+            Color.white
+                .shadow(color: Color.black.opacity(0.08), radius: 8, y: -3)
+                .padding(.top, 18)
+
+            // Tab Buttons
             HStack(spacing: 0) {
                 // Left Tabs: List, Collect
                 tabButton(for: .list)
@@ -117,30 +107,27 @@ struct DashboardView: View {
                 tabButton(for: .core)
                 tabButton(for: .suki)
             }
-            .frame(height: 60)
+            .frame(height: 52)
             .padding(.horizontal, 6)
-            .background(
-                Color.white
-                    .shadow(color: Color.black.opacity(0.06), radius: 10, y: -4)
-                    .ignoresSafeArea(edges: .bottom)
-            )
+            .padding(.top, 20)
+            .padding(.bottom, 22) // Space for home indicator
 
-            // Center Elevated Floating Red Mic Button (88pt with cream border)
+            // Center Elevated Floating Red Mic Button (78pt with cream border)
             Button {
                 Haptics.heavy()
                 isShowingVoiceModal = true
             } label: {
                 ZStack {
-                    // Outer 80x80 ring with cream border
+                    // Outer cream ring matching wireframe
                     Circle()
                         .fill(TindAITheme.cream)
-                        .frame(width: 80, height: 80)
+                        .frame(width: 78, height: 78)
 
-                    // Inner 68x68 Red Mic Circle
+                    // Inner brand red circle with shadow
                     Circle()
                         .fill(TindAITheme.brandRed)
-                        .frame(width: 68, height: 68)
-                        .shadow(color: TindAITheme.brandRed.opacity(0.4), radius: 10, y: 5)
+                        .frame(width: 66, height: 66)
+                        .shadow(color: TindAITheme.brandRed.opacity(0.38), radius: 8, y: 4)
 
                     Image(systemName: "mic.fill")
                         .font(.system(size: 26, weight: .bold))
@@ -148,8 +135,10 @@ struct DashboardView: View {
                 }
             }
             .buttonStyle(.pressable(scale: 0.92))
-            .offset(y: -24) // Floats above the tab bar notch
+            .padding(.top, 0) // Sits at top (y=0) and floats 18pt above the white bar
         }
+        .frame(height: 94)
+        .background(Color.white)
     }
 
     private func tabButton(for tab: TabItem) -> some View {

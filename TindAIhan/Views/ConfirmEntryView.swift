@@ -286,14 +286,6 @@ struct ConfirmEntryView: View {
                 self.customerName = parsed.name
                 self.items = parsed.items
                 self.dueDate = parsed.dueDate
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    TextToSpeechService.shared.speakUtangSummary(
-                        customer: customerName,
-                        total: totalAmount,
-                        items: items
-                    )
-                }
             }
         }
     }
@@ -336,7 +328,6 @@ struct ConfirmEntryView: View {
         }
 
         try? modelContext.save()
-        TextToSpeechService.shared.speak("Nailista na po sa listahan para kay \(customerName)!")
         dismiss()
         onSaveComplete()
     }
