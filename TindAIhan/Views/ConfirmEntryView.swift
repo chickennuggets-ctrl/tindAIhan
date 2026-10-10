@@ -60,22 +60,6 @@ struct ConfirmEntryView: View {
                             }
 
                             Spacer()
-
-                            Button {
-                                Haptics.light()
-                                TextToSpeechService.shared.speakUtangSummary(
-                                    customer: customerName,
-                                    total: totalAmount,
-                                    items: items
-                                )
-                            } label: {
-                                Image(systemName: "speaker.wave.2.fill")
-                                    .font(.system(size: 19, weight: .bold))
-                                    .foregroundStyle(TindAITheme.brandRed)
-                                    .frame(width: 44, height: 44)
-                                    .background(Color.white, in: Circle())
-                                    .shadow(color: Color.black.opacity(0.06), radius: 6, y: 2)
-                            }
                         }
                         .padding(.top, 10)
 

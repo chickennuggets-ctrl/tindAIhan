@@ -123,7 +123,7 @@ struct SingilView: View {
 
             ScrollView(showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 22) {
-                    // Header matching Figma Image 2 with Text-to-Speech button
+                    // Header matching Figma Image 2
                     HStack(alignment: .center) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Collect")
@@ -136,24 +136,6 @@ struct SingilView: View {
                         }
 
                         Spacer()
-
-                        // Pakinggan ang listahan TTS button
-                        Button {
-                            Haptics.light()
-                            speakAllCollections()
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "speaker.wave.2.fill")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("Pakinggan")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                            }
-                            .foregroundStyle(TindAITheme.brandRed)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.white, in: Capsule())
-                            .shadow(color: Color.black.opacity(0.05), radius: 4, y: 2)
-                        }
                     }
                     .padding(.top, 10)
                     .padding(.horizontal, 20)
@@ -298,22 +280,6 @@ struct SingilView: View {
 
                                     Spacer()
 
-                                    // Speaker button to listen to this customer's details
-                                    Button {
-                                        Haptics.light()
-                                        TextToSpeechService.shared.speakCollectionReminder(
-                                            customer: item.customer,
-                                            amount: item.totalAmount,
-                                            dueText: item.dueDateDescription
-                                        )
-                                    } label: {
-                                        Image(systemName: "speaker.wave.2.fill")
-                                            .font(.system(size: 13))
-                                            .foregroundStyle(TindAITheme.brandRed)
-                                            .padding(6)
-                                            .background(Color.gray.opacity(0.08), in: Circle())
-                                    }
-
                                     Text(item.formattedAmount)
                                         .font(.system(size: 19, weight: .heavy, design: .rounded))
                                         .foregroundStyle(TindAITheme.textPrimary)
@@ -401,16 +367,6 @@ struct SingilView: View {
             }
             try? modelContext.save()
         }
-    }
-
-    private func speakAllCollections() {
-        let total = Int(totalSingilin)
-        let count = collections.count
-        var message = "Kabuuang singilin: \(total) pesos mula sa \(count) na suki. "
-        if let first = overdueCollections.first {
-            message += "May lampas na utang si \(first.customer) na \(Int(first.totalAmount)) pesos. "
-        }
-        TextToSpeechService.shared.speak(message)
     }
 
     private func openSMSReminder(for collection: SukiCollection) {

@@ -203,11 +203,6 @@ struct SukiDirectoryView: View {
     }
 }
 
-private struct CustomerDetailSheetItem: Identifiable {
-    var id: String { name }
-    let name: String
-}
-
 #Preview {
     SukiDirectoryView()
         .modelContainer(for: LedgerEntry.self, inMemory: true)

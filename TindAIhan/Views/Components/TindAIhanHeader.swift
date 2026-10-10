@@ -12,7 +12,6 @@ import SwiftUI
 struct TindAIhanHeader: View {
     var isOfflineReady: Bool = true
     var onSettingsTapped: (() -> Void)? = nil
-    var onSpeakTapped: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
@@ -44,21 +43,6 @@ struct TindAIhanHeader: View {
             .padding(.vertical, 6)
             .background(TindAITheme.badgeGreenBg, in: Capsule())
 
-            // Optional speaker icon to listen to ledger summary
-            if let onSpeakTapped {
-                Button {
-                    Haptics.light()
-                    onSpeakTapped()
-                } label: {
-                    Image(systemName: "speaker.wave.2.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(TindAITheme.brandRed)
-                        .padding(8)
-                        .background(Color.white, in: Circle())
-                }
-                .buttonStyle(.pressable(scale: 0.92))
-            }
-
             // Optional settings icon
             if let onSettingsTapped {
                 Button {
@@ -82,6 +66,6 @@ struct TindAIhanHeader: View {
 #Preview {
     ZStack {
         TindAITheme.cream.ignoresSafeArea()
-        TindAIhanHeader(onSettingsTapped: {}, onSpeakTapped: {})
+        TindAIhanHeader(onSettingsTapped: {})
     }
 }

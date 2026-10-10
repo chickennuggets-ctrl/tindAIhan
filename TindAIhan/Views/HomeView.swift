@@ -17,6 +17,13 @@ struct HomeView: View {
     @State private var isSearching = false
     @State private var selectedCustomer: String? = nil
     @State private var expandedGroupId: UUID? = nil
+    @State private var selectedFilter: HomeListFilter = .all
+
+    enum HomeListFilter {
+        case all
+        case unpaid
+        case overdue
+    }
 
     // Compute stats
     private var unpaidEntries: [LedgerEntry] {
@@ -84,11 +91,20 @@ struct HomeView: View {
     }
 
     private var groupedTransactions: [TransactionGroup] {
-        let filtered = allEntries.filter { entry in
+        var filtered = allEntries.filter { entry in
             guard entry.quantity > 0 else { return false }
             if searchText.isEmpty { return true }
             return entry.customer.localizedCaseInsensitiveContains(searchText) ||
                    entry.item.localizedCaseInsensitiveContains(searchText)
+        }
+
+        if selectedFilter == .unpaid {
+            filtered = filtered.filter { !$0.isPaid }
+        } else if selectedFilter == .overdue {
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: .now)
+            let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: today) ?? today
+            filtered = filtered.filter { !$0.isPaid && $0.dueDate <= oneWeekAgo }
         }
 
         // Group by transactionId
@@ -131,9 +147,6 @@ struct HomeView: View {
                     TindAIhanHeader(
                         onSettingsTapped: {
                             isShowingSettings = true
-                        },
-                        onSpeakTapped: {
-                            speakHomeSummary()
                         }
                     )
 
@@ -149,21 +162,49 @@ struct HomeView: View {
                             .contentTransition(.numericText())
 
                         HStack(spacing: 10) {
-                            // Amber Suki Pill
-                            Text("\(uniqueUnpaidCustomersCount) suki may utang")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                            // Amber Suki Pill (Clickable Filter)
+                            Button {
+                                Haptics.light()
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    selectedFilter = (selectedFilter == .unpaid ? .all : .unpaid)
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    if selectedFilter == .unpaid {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 11, weight: .black))
+                                    }
+                                    Text("\(uniqueUnpaidCustomersCount) suki may utang")
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                }
                                 .foregroundStyle(TindAITheme.textPrimary)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 7)
                                 .background(TindAITheme.accentYellow, in: Capsule())
+                            }
+                            .buttonStyle(.pressable(scale: 0.94))
 
-                            // Overdue Pill
-                            Text("\(overdueCount) lampas 1 linggo")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color(red: 203/255, green: 213/255, blue: 225/255))
+                            // Overdue Pill (Clickable Filter)
+                            Button {
+                                Haptics.light()
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    selectedFilter = (selectedFilter == .overdue ? .all : .overdue)
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    if selectedFilter == .overdue {
+                                        Image(systemName: "exclamationmark.circle.fill")
+                                            .font(.system(size: 11, weight: .bold))
+                                    }
+                                    Text("\(overdueCount) lampas 1 linggo")
+                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                }
+                                .foregroundStyle(selectedFilter == .overdue ? .white : Color(red: 203/255, green: 213/255, blue: 225/255))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 7)
-                                .background(TindAITheme.cardNavyLight, in: Capsule())
+                                .background(selectedFilter == .overdue ? TindAITheme.brandRed : TindAITheme.cardNavyLight, in: Capsule())
+                            }
+                            .buttonStyle(.pressable(scale: 0.94))
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -313,38 +354,23 @@ struct HomeView: View {
                                                 .padding(.horizontal, 20)
                                             }
 
-                                            HStack(spacing: 8) {
-                                                // TTS Audio Button
-                                                Button {
-                                                    Haptics.light()
-                                                    speakGroup(group)
-                                                } label: {
-                                                    HStack(spacing: 4) {
-                                                        Image(systemName: "speaker.wave.2.fill")
-                                                        Text("Pakinggan")
-                                                    }
-                                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                                    .foregroundStyle(TindAITheme.brandRed)
-                                                    .padding(.horizontal, 10)
-                                                    .padding(.vertical, 6)
-                                                    .background(TindAITheme.brandRed.opacity(0.08), in: Capsule())
-                                                }
-
+                                            HStack(spacing: 12) {
                                                 // Full history details
                                                 Button {
                                                     Haptics.light()
                                                     selectedCustomer = group.customer
                                                 } label: {
-                                                    HStack(spacing: 4) {
-                                                        Image(systemName: "list.bullet")
+                                                    HStack(spacing: 5) {
+                                                        Image(systemName: "person.text.rectangle.fill")
                                                         Text("Kasaysayan")
                                                     }
-                                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                                    .font(.system(size: 13, weight: .bold, design: .rounded))
                                                     .foregroundStyle(TindAITheme.textPrimary)
-                                                    .padding(.horizontal, 10)
-                                                    .padding(.vertical, 6)
-                                                    .background(Color.gray.opacity(0.1), in: Capsule())
+                                                    .padding(.horizontal, 14)
+                                                    .padding(.vertical, 8)
+                                                    .background(Color.gray.opacity(0.12), in: Capsule())
                                                 }
+                                                .buttonStyle(.pressable(scale: 0.95))
 
                                                 Spacer()
 
@@ -353,13 +379,17 @@ struct HomeView: View {
                                                     Haptics.success()
                                                     markGroupPaid(group)
                                                 } label: {
-                                                    Text(group.isPaid ? "Bayad na" : "Bayaran")
-                                                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                                                        .foregroundStyle(group.isPaid ? Color.green : TindAITheme.tealButton)
-                                                        .padding(.horizontal, 10)
-                                                        .padding(.vertical, 6)
-                                                        .background((group.isPaid ? Color.green : TindAITheme.tealButton).opacity(0.12), in: Capsule())
+                                                    HStack(spacing: 5) {
+                                                        Image(systemName: group.isPaid ? "checkmark.circle.fill" : "checkmark.circle")
+                                                        Text(group.isPaid ? "Bayad na" : "Bayaran")
+                                                    }
+                                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                                    .foregroundStyle(group.isPaid ? Color.green : .white)
+                                                    .padding(.horizontal, 16)
+                                                    .padding(.vertical, 8)
+                                                    .background(group.isPaid ? Color.green.opacity(0.15) : TindAITheme.tealButton, in: Capsule())
                                                 }
+                                                .buttonStyle(.pressable(scale: 0.95))
                                             }
                                             .padding(.horizontal, 20)
                                             .padding(.bottom, 12)
@@ -416,19 +446,6 @@ struct HomeView: View {
         }
         try? modelContext.save()
         Haptics.success()
-    }
-
-    private func speakHomeSummary() {
-        let total = Int(totalUtang)
-        let msg = "Magandang araw! Kabuuang utang para sa araw na ito: \(total) pesos mula sa \(uniqueUnpaidCustomersCount) na suki. May \(overdueCount) na lampas na ng isang linggo."
-        TextToSpeechService.shared.speak(msg)
-    }
-
-    private func speakGroup(_ group: TransactionGroup) {
-        let total = Int(group.total)
-        let items = group.itemsSummary
-        let msg = "\(group.customer): inutang ay \(items). Kabuuang halaga: \(total) pesos."
-        TextToSpeechService.shared.speak(msg)
     }
 
     private func markGroupPaid(_ group: TransactionGroup) {
@@ -512,7 +529,7 @@ struct DemoSettingsSheet: View {
     }
 }
 
-private struct CustomerDetailSheetItem: Identifiable {
+struct CustomerDetailSheetItem: Identifiable {
     var id: String { name }
     let name: String
 }

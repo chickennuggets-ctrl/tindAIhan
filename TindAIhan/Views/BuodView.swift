@@ -13,6 +13,7 @@ struct BuodView: View {
     @State private var selectedTab: BuodTab = .mgaSuki
     @State private var selectedFilter: SukiSortFilter = .name
     @State private var selectedMonth = Date.now
+    @State private var selectedCustomer: String? = nil
 
     enum BuodTab: String, CaseIterable {
         case mgaSuki = "Suki"
@@ -106,6 +107,12 @@ struct BuodView: View {
             }
             .scrollBounceBehavior(.always)
         }
+        .sheet(item: Binding(
+            get: { selectedCustomer.map { CustomerDetailSheetItem(name: $0) } },
+            set: { selectedCustomer = $0?.name }
+        )) { item in
+            CustomerDetailView(customerName: item.name)
+        }
     }
 
     // MARK: - Screen 6: Mga Suki Tab Content
@@ -157,45 +164,52 @@ struct BuodView: View {
             // Suki List
             VStack(spacing: 0) {
                 ForEach(sortedSukiList) { suki in
-                    HStack(spacing: 14) {
-                        SukiAvatar(name: suki.name, size: 46)
+                    Button {
+                        Haptics.light()
+                        selectedCustomer = suki.name
+                    } label: {
+                        HStack(spacing: 14) {
+                            SukiAvatar(name: suki.name, size: 46)
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(suki.name)
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundStyle(TindAITheme.textPrimary)
-
-                            Text("Collect by \(suki.dueDateStr) · \(suki.itemCount) items")
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(TindAITheme.textSecondary)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text(suki.formattedTotal)
-                                .font(.system(size: 16, weight: .heavy, design: .rounded))
-                                .foregroundStyle(TindAITheme.textPrimary)
-
-                            if suki.isOverdue {
-                                Text("Overdue")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(TindAITheme.brandRed, in: Capsule())
-                            } else if suki.isDueToday {
-                                Text("Today")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(suki.name)
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
                                     .foregroundStyle(TindAITheme.textPrimary)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(TindAITheme.accentYellow, in: Capsule())
+
+                                Text("Collect by \(suki.dueDateStr) · \(suki.itemCount) items")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundStyle(TindAITheme.textSecondary)
+                            }
+
+                            Spacer()
+
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(suki.formattedTotal)
+                                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(TindAITheme.textPrimary)
+
+                                if suki.isOverdue {
+                                    Text("Overdue")
+                                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(TindAITheme.brandRed, in: Capsule())
+                                } else if suki.isDueToday {
+                                    Text("Today")
+                                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                                        .foregroundStyle(TindAITheme.textPrimary)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(TindAITheme.accentYellow, in: Capsule())
+                                }
                             }
                         }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 16)
+                    .buttonStyle(.pressable(scale: 0.98))
 
                     Divider()
                         .padding(.leading, 74)
@@ -259,20 +273,33 @@ struct BuodView: View {
 
             // Filter Chips
             HStack(spacing: 10) {
-                Button("Names A-Z") {}
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(TindAITheme.textPrimary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(TindAITheme.accentYellow, in: Capsule())
+                Button {
+                    Haptics.light()
+                    withAnimation { selectedFilter = .name }
+                } label: {
+                    Text("Names A-Z")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(TindAITheme.textPrimary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(selectedFilter == .name ? TindAITheme.accentYellow : Color.white, in: Capsule())
+                        .overlay(Capsule().stroke(Color.gray.opacity(selectedFilter == .name ? 0 : 0.3), lineWidth: 1))
+                }
+                .buttonStyle(.pressable(scale: 0.95))
 
-                Button("Most Amount") {}
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(TindAITheme.textPrimary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.white, in: Capsule())
-                    .overlay(Capsule().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                Button {
+                    Haptics.light()
+                    withAnimation { selectedFilter = .highest }
+                } label: {
+                    Text("Most Amount")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(TindAITheme.textPrimary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(selectedFilter == .highest ? TindAITheme.accentYellow : Color.white, in: Capsule())
+                        .overlay(Capsule().stroke(Color.gray.opacity(selectedFilter == .highest ? 0 : 0.3), lineWidth: 1))
+                }
+                .buttonStyle(.pressable(scale: 0.95))
 
                 Spacer()
             }
@@ -281,24 +308,34 @@ struct BuodView: View {
             // Monthly Suki List matching Image 4
             VStack(spacing: 0) {
                 ForEach(sortedSukiList.prefix(3)) { suki in
-                    HStack(spacing: 14) {
-                        SukiAvatar(name: suki.name, size: 46)
+                    Button {
+                        Haptics.light()
+                        selectedCustomer = suki.name
+                    } label: {
+                        HStack(spacing: 14) {
+                            SukiAvatar(name: suki.name, size: 46)
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(suki.name)
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                            Text("\(suki.itemCount * 3) items · \(suki.itemsSnippet)")
-                                .font(.system(size: 12, design: .rounded))
-                                .foregroundStyle(TindAITheme.textSecondary)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(suki.name)
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundStyle(TindAITheme.textPrimary)
+                                Text("\(suki.itemCount * 3) items · \(suki.itemsSnippet)")
+                                    .font(.system(size: 12, design: .rounded))
+                                    .foregroundStyle(TindAITheme.textSecondary)
+                            }
+
+                            Spacer()
+
+                            Text(String(format: "₱%.2f", suki.total))
+                                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                                .foregroundStyle(TindAITheme.textPrimary)
                         }
-
-                        Spacer()
-
-                        Text(String(format: "₱%.2f", suki.total))
-                            .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 16)
+                    .buttonStyle(.pressable(scale: 0.98))
+
                     Divider().padding(.leading, 74)
                 }
             }
