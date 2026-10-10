@@ -51,11 +51,31 @@ struct ConfirmEntryView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        // Title Header matching Figma Image 3
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Is this correct?")
-                                .font(.system(size: 32, weight: .heavy, design: .rounded))
-                                .foregroundStyle(TindAITheme.textPrimary)
+                        // Title Header matching Figma Image 3 with Speaker button
+                        HStack {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Is this correct?")
+                                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(TindAITheme.textPrimary)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                Haptics.light()
+                                TextToSpeechService.shared.speakUtangSummary(
+                                    customer: customerName,
+                                    total: totalAmount,
+                                    items: items
+                                )
+                            } label: {
+                                Image(systemName: "speaker.wave.2.fill")
+                                    .font(.system(size: 19, weight: .bold))
+                                    .foregroundStyle(TindAITheme.brandRed)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color.white, in: Circle())
+                                    .shadow(color: Color.black.opacity(0.06), radius: 6, y: 2)
+                            }
                         }
                         .padding(.top, 10)
 
@@ -266,6 +286,14 @@ struct ConfirmEntryView: View {
                 self.customerName = parsed.name
                 self.items = parsed.items
                 self.dueDate = parsed.dueDate
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    TextToSpeechService.shared.speakUtangSummary(
+                        customer: customerName,
+                        total: totalAmount,
+                        items: items
+                    )
+                }
             }
         }
     }
@@ -308,6 +336,7 @@ struct ConfirmEntryView: View {
         }
 
         try? modelContext.save()
+        TextToSpeechService.shared.speak("Nailista na po sa listahan para kay \(customerName)!")
         dismiss()
         onSaveComplete()
     }

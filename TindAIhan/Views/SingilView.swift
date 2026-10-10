@@ -2,6 +2,10 @@
 //  SingilView.swift
 //  TindAIhan
 //
+//  Created for AppBuildersPH Hackathon 2026.
+//  Matches wireframe 9 (Singil / Collect) with collapsible sections,
+//  expandable item breakdown cards, smooth scrolling, and Text-to-Speech announcements.
+//
 
 import SwiftUI
 import SwiftData
@@ -15,8 +19,13 @@ struct SingilView: View {
     @State private var smsMessageText = ""
     @State private var selectedCustomerName = ""
 
+    // Collapsible section state
+    @State private var collapsedSections: Set<String> = []
+    // Expandable item breakdown cards state
+    @State private var expandedCardIds: Set<String> = []
+
     private var unpaidEntries: [LedgerEntry] {
-        allEntries.filter { !$0.isPaid }
+        allEntries.filter { !$0.isPaid && $0.quantity > 0 }
     }
 
     private var totalSingilin: Double {
@@ -30,14 +39,6 @@ struct SingilView: View {
         formatter.maximumFractionDigits = 2
         let numStr = formatter.string(from: NSNumber(value: totalSingilin)) ?? String(format: "%.2f", totalSingilin)
         return "₱\(numStr)"
-    }
-
-    private var todaySubtitle: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tl_PH")
-        formatter.dateFormat = "EEEE, MMM d"
-        let datePart = formatter.string(from: .now).capitalized
-        return "\(datePart) · \(formattedTotalSingilin) ang dapat singilin"
     }
 
     // Customer aggregation for collections
@@ -120,22 +121,44 @@ struct SingilView: View {
             TindAITheme.cream
                 .ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
+            ScrollView(showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 22) {
-                    // Header matching Figma Image 2
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Collect")
-                            .font(.system(size: 34, weight: .heavy, design: .rounded))
-                            .foregroundStyle(TindAITheme.textPrimary)
+                    // Header matching Figma Image 2 with Text-to-Speech button
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Collect")
+                                .font(.system(size: 34, weight: .heavy, design: .rounded))
+                                .foregroundStyle(TindAITheme.textPrimary)
 
-                        Text("Saturday, October 10 · \(formattedTotalSingilin) must be collected")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(TindAITheme.textSecondary)
+                            Text("Saturday, October 10 · \(formattedTotalSingilin) must be collected")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundStyle(TindAITheme.textSecondary)
+                        }
+
+                        Spacer()
+
+                        // Pakinggan ang listahan TTS button
+                        Button {
+                            Haptics.light()
+                            speakAllCollections()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "speaker.wave.2.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                Text("Pakinggan")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                            }
+                            .foregroundStyle(TindAITheme.brandRed)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.white, in: Capsule())
+                            .shadow(color: Color.black.opacity(0.05), radius: 4, y: 2)
+                        }
                     }
                     .padding(.top, 10)
                     .padding(.horizontal, 20)
 
-                    // 1. OVERDUE
+                    // 1. OVERDUE (Collapsible Accordion)
                     if !overdueCollections.isEmpty {
                         collectionSection(
                             title: "OVERDUE",
@@ -146,7 +169,7 @@ struct SingilView: View {
                         )
                     }
 
-                    // 2. TODAY
+                    // 2. TODAY (Collapsible Accordion)
                     if !todayCollections.isEmpty {
                         collectionSection(
                             title: "TODAY",
@@ -157,7 +180,7 @@ struct SingilView: View {
                         )
                     }
 
-                    // 3. KINSENAS · OCTOBER 15
+                    // 3. KINSENAS · OCTOBER 15 (Collapsible Accordion)
                     if !upcomingCollections.isEmpty {
                         collectionSection(
                             title: "KINSENAS · OCTOBER 15",
@@ -184,8 +207,9 @@ struct SingilView: View {
                         .padding(.vertical, 60)
                     }
 
+                    // Bottom padding to ensure bottom nav bar never obscures items
                     Spacer()
-                        .frame(height: 100)
+                        .frame(height: 120)
                 }
             }
         }
@@ -201,72 +225,167 @@ struct SingilView: View {
         subtitleColor: Color,
         items: [SukiCollection]
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(titleColor)
-                .padding(.horizontal, 20)
+        let isCollapsed = collapsedSections.contains(title)
 
-            VStack(spacing: 14) {
-                ForEach(items) { item in
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.customer)
-                                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                                    .foregroundStyle(TindAITheme.textPrimary)
-
-                                Text(item.dueDateDescription)
-                                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                                    .foregroundStyle(subtitleColor)
-                            }
-
-                            Spacer()
-
-                            Text(item.formattedAmount)
-                                .font(.system(size: 19, weight: .heavy, design: .rounded))
-                                .foregroundStyle(TindAITheme.textPrimary)
-                        }
-
-                        // Buttons: Send a text and Paid matching Figma Image 2
-                        HStack(spacing: 12) {
-                            Button {
-                                openSMSReminder(for: item)
-                            } label: {
-                                Text("Send a text")
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(TindAITheme.textPrimary)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 44)
-                                    .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.gray.opacity(0.4), lineWidth: 1.5)
-                                    )
-                            }
-                            .buttonStyle(.pressable(scale: 0.95))
-
-                            Button {
-                                markPaid(for: item)
-                            } label: {
-                                Text("Paid")
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 44)
-                                    .background(TindAITheme.tealButton, in: RoundedRectangle(cornerRadius: 12))
-                            }
-                            .buttonStyle(.pressable(scale: 0.95))
-                        }
+        return VStack(alignment: .leading, spacing: 10) {
+            // Collapsible Section Header
+            Button {
+                Haptics.light()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    if isCollapsed {
+                        collapsedSections.remove(title)
+                    } else {
+                        collapsedSections.insert(title)
                     }
-                    .padding(18)
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(borderColor, lineWidth: 1.5)
-                    )
-                    .shadow(color: Color.black.opacity(0.02), radius: 6, y: 2)
-                    .padding(.horizontal, 20)
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundStyle(titleColor)
+
+                    Text("(\(items.count))")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(titleColor.opacity(0.8))
+
+                    Spacer()
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(titleColor)
+                        .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+                }
+                .padding(.horizontal, 20)
+                .contentShape(Rectangle())
+            }
+
+            // Cards in Section
+            if !isCollapsed {
+                VStack(spacing: 14) {
+                    ForEach(items) { item in
+                        let isCardExpanded = expandedCardIds.contains(item.id)
+
+                        VStack(alignment: .leading, spacing: 14) {
+                            // Top Row: Customer Info + Tap to Expand Drawer
+                            Button {
+                                Haptics.light()
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                    if isCardExpanded {
+                                        expandedCardIds.remove(item.id)
+                                    } else {
+                                        expandedCardIds.insert(item.id)
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        HStack(spacing: 6) {
+                                            Text(item.customer)
+                                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                                .foregroundStyle(TindAITheme.textPrimary)
+
+                                            Image(systemName: "chevron.down")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundStyle(TindAITheme.textSecondary)
+                                                .rotationEffect(.degrees(isCardExpanded ? 180 : 0))
+                                        }
+
+                                        Text(item.dueDateDescription)
+                                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                                            .foregroundStyle(subtitleColor)
+                                    }
+
+                                    Spacer()
+
+                                    // Speaker button to listen to this customer's details
+                                    Button {
+                                        Haptics.light()
+                                        TextToSpeechService.shared.speakCollectionReminder(
+                                            customer: item.customer,
+                                            amount: item.totalAmount,
+                                            dueText: item.dueDateDescription
+                                        )
+                                    } label: {
+                                        Image(systemName: "speaker.wave.2.fill")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(TindAITheme.brandRed)
+                                            .padding(6)
+                                            .background(Color.gray.opacity(0.08), in: Circle())
+                                    }
+
+                                    Text(item.formattedAmount)
+                                        .font(.system(size: 19, weight: .heavy, design: .rounded))
+                                        .foregroundStyle(TindAITheme.textPrimary)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            // Expandable Itemized Drawer
+                            if isCardExpanded {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Divider()
+                                    Text("Mga Naka-lista:")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .foregroundStyle(TindAITheme.textSecondary)
+
+                                    ForEach(item.entries) { e in
+                                        HStack {
+                                            Text("• \(e.quantity)x \(e.item.capitalized)")
+                                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                                .foregroundStyle(TindAITheme.textPrimary)
+                                            Spacer()
+                                            Text(e.formattedTotal)
+                                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                                .foregroundStyle(TindAITheme.textSecondary)
+                                        }
+                                    }
+                                    Divider()
+                                }
+                                .padding(.vertical, 4)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
+
+                            // Buttons: Send a text and Paid matching Figma Image 2
+                            HStack(spacing: 12) {
+                                Button {
+                                    openSMSReminder(for: item)
+                                } label: {
+                                    Text("Send a text")
+                                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                                        .foregroundStyle(TindAITheme.textPrimary)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 44)
+                                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(Color.gray.opacity(0.4), lineWidth: 1.5)
+                                        )
+                                }
+                                .buttonStyle(.pressable(scale: 0.95))
+
+                                Button {
+                                    markPaid(for: item)
+                                } label: {
+                                    Text("Paid")
+                                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 44)
+                                        .background(TindAITheme.tealButton, in: RoundedRectangle(cornerRadius: 12))
+                                }
+                                .buttonStyle(.pressable(scale: 0.95))
+                            }
+                        }
+                        .padding(18)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(borderColor, lineWidth: 1.5)
+                        )
+                        .shadow(color: Color.black.opacity(0.02), radius: 6, y: 2)
+                        .padding(.horizontal, 20)
+                    }
                 }
             }
         }
@@ -280,7 +399,22 @@ struct SingilView: View {
                 entry.paidAt = .now
             }
             try? modelContext.save()
+            // Voice announcement of payment
+            TextToSpeechService.shared.speakPaymentReceived(
+                customer: collection.customer,
+                amount: collection.totalAmount
+            )
         }
+    }
+
+    private func speakAllCollections() {
+        let total = Int(totalSingilin)
+        let count = collections.count
+        var message = "Kabuuang singilin: \(total) pesos mula sa \(count) na suki. "
+        if let first = overdueCollections.first {
+            message += "May lampas na utang si \(first.customer) na \(Int(first.totalAmount)) pesos. "
+        }
+        TextToSpeechService.shared.speak(message)
     }
 
     private func openSMSReminder(for collection: SukiCollection) {
@@ -300,34 +434,54 @@ struct SingilView: View {
                     .foregroundStyle(TindAITheme.textPrimary)
 
                 TextEditor(text: $smsMessageText)
-                    .font(.system(size: 15, design: .rounded))
-                    .padding(10)
-                    .background(Color(red: 241/255, green: 245/255, blue: 249/255), in: RoundedRectangle(cornerRadius: 12))
+                    .padding(12)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.3), lineWidth: 1))
                     .frame(height: 140)
 
-                Button {
-                    Haptics.success()
-                    #if os(iOS)
-                    UIPasteboard.general.string = smsMessageText
-                    #endif
-                    showingSMSAlert = false
-                } label: {
-                    HStack {
-                        Image(systemName: "doc.on.doc.fill")
-                        Text("Kopyahin ang Mensahe")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                HStack(spacing: 12) {
+                    Button {
+                        UIPasteboard.general.string = smsMessageText
+                        Haptics.success()
+                        showingSMSAlert = false
+                    } label: {
+                        HStack {
+                            Image(systemName: "doc.on.doc.fill")
+                            Text("Kopyahin Text")
+                        }
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(TindAITheme.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.4), lineWidth: 1))
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(TindAITheme.brandRed, in: RoundedRectangle(cornerRadius: 14))
+
+                    Button {
+                        Haptics.medium()
+                        if let encoded = smsMessageText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                           let url = URL(string: "sms:&body=\(encoded)") {
+                            UIApplication.shared.open(url)
+                        }
+                        showingSMSAlert = false
+                    } label: {
+                        HStack {
+                            Image(systemName: "paperplane.fill")
+                            Text("Buksan SMS")
+                        }
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(TindAITheme.brandRed, in: RoundedRectangle(cornerRadius: 12))
+                    }
                 }
-                .buttonStyle(.pressable(scale: 0.95))
 
                 Spacer()
             }
             .padding(20)
-            .navigationTitle("I-text ang Suki")
+            .background(TindAITheme.cream.ignoresSafeArea())
+            .navigationTitle("SMS Paalala")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

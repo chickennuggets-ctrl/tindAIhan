@@ -3,7 +3,7 @@
 //  TindAIhan
 //
 //  Created for AppBuildersPH Hackathon 2026.
-//  App header showing TindAIhan branding and 100% offline status capsule matching Wireframe 1.
+//  App header showing TindAIhan branding, 100% offline status capsule, and audio read-out button.
 //
 
 import SwiftUI
@@ -12,9 +12,10 @@ import SwiftUI
 struct TindAIhanHeader: View {
     var isOfflineReady: Bool = true
     var onSettingsTapped: (() -> Void)? = nil
+    var onSpeakTapped: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 8) {
             // Brand Logo: TindAIhan with red "AI"
             HStack(spacing: 0) {
                 Text("Tind")
@@ -39,9 +40,24 @@ struct TindAIhanHeader: View {
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(TindAITheme.badgeGreenText)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(TindAITheme.badgeGreenBg, in: Capsule())
+
+            // Optional speaker icon to listen to ledger summary
+            if let onSpeakTapped {
+                Button {
+                    Haptics.light()
+                    onSpeakTapped()
+                } label: {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(TindAITheme.brandRed)
+                        .padding(8)
+                        .background(Color.white, in: Circle())
+                }
+                .buttonStyle(.pressable(scale: 0.92))
+            }
 
             // Optional settings icon
             if let onSettingsTapped {
@@ -50,7 +66,7 @@ struct TindAIhanHeader: View {
                     onSettingsTapped()
                 } label: {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(TindAITheme.textSecondary)
                         .padding(8)
                         .background(Color.white, in: Circle())
@@ -59,12 +75,13 @@ struct TindAIhanHeader: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .padding(.top, 12)
     }
 }
 
 #Preview {
-    TindAIhanHeader(onSettingsTapped: {})
-        .background(TindAITheme.cream)
+    ZStack {
+        TindAITheme.cream.ignoresSafeArea()
+        TindAIhanHeader(onSettingsTapped: {}, onSpeakTapped: {})
+    }
 }

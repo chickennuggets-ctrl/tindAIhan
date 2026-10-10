@@ -19,6 +19,7 @@ final class LiveSpeechRecognizer: NSObject {
     var audioLevel: CGFloat = 0.0 // 0.0 to 1.0 for real-time waveform animation
     var errorMessage: String? = nil
     var recordedFileURL: URL? = nil
+    var isAuthorized: Bool = false
 
     private var audioEngine: AVAudioEngine?
     private var speechRecognizer: SFSpeechRecognizer?
@@ -28,11 +29,19 @@ final class LiveSpeechRecognizer: NSObject {
 
     override init() {
         super.init()
-        // Support Tagalog/Filipino or English (Philippines) locale
-        self.speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "fil-PH")) ??
-                                SFSpeechRecognizer(locale: Locale(identifier: "tl-PH")) ??
-                                SFSpeechRecognizer(locale: Locale(identifier: "en-PH")) ??
-                                SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        setupSpeechRecognizer()
+    }
+
+    private func setupSpeechRecognizer() {
+        // en-PH is the official Philippine locale supported by Apple Speech
+        // which understands Taglish and Filipino accent offline/on-device.
+        if let phRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-PH")), phRecognizer.isAvailable {
+            self.speechRecognizer = phRecognizer
+        } else if let currentRecognizer = SFSpeechRecognizer(locale: Locale.current), currentRecognizer.isAvailable {
+            self.speechRecognizer = currentRecognizer
+        } else {
+            self.speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        }
     }
 
     /// Check and request all necessary permissions (Microphone & Speech Recognition)
@@ -56,9 +65,13 @@ final class LiveSpeechRecognizer: NSObject {
             }
         }
 
-        if speechStatus != .authorized && speechStatus != .notDetermined {
-            await MainActor.run {
-                self.errorMessage = "Kailangan ng speech recognition authorization."
+        let authorized = micGranted && (speechStatus == .authorized || speechStatus == .notDetermined)
+        await MainActor.run {
+            self.isAuthorized = authorized
+            if !micGranted {
+                self.errorMessage = "Kailangan ng pahintulot sa microphone sa Settings."
+            } else if speechStatus == .denied || speechStatus == .restricted {
+                self.errorMessage = "Kailangan ng Speech Recognition sa Settings."
             }
         }
 
@@ -73,83 +86,99 @@ final class LiveSpeechRecognizer: NSObject {
         errorMessage = nil
         audioLevel = 0.0
 
+        setupSpeechRecognizer()
+
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
+            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
 
             let engine = AVAudioEngine()
             self.audioEngine = engine
             let inputNode = engine.inputNode
-            let recordingFormat = inputNode.outputFormat(forBus: 0)
+            let inputFormat = inputNode.outputFormat(forBus: 0)
 
-            // Setup audio file for saving captured PCM audio if valid sample rate
-            if recordingFormat.sampleRate > 0 {
-                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("live_recording.wav")
-                try? FileManager.default.removeItem(at: tempURL)
-                self.recordedFileURL = tempURL
+            // Ensure valid format
+            let recordingFormat: AVAudioFormat
+            if inputFormat.sampleRate > 0 && inputFormat.channelCount > 0 {
+                recordingFormat = inputFormat
+            } else {
+                recordingFormat = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1) ?? inputFormat
+            }
 
-                do {
-                    self.audioFile = try AVAudioFile(forWriting: tempURL, settings: recordingFormat.settings)
-                } catch {
-                    print("Note: AVAudioFile creation skipped: \(error)")
+            // Setup audio file for saving captured PCM audio
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("live_recording.wav")
+            try? FileManager.default.removeItem(at: tempURL)
+            self.recordedFileURL = tempURL
+
+            do {
+                self.audioFile = try AVAudioFile(forWriting: tempURL, settings: recordingFormat.settings)
+            } catch {
+                print("Note: AVAudioFile creation notice: \(error.localizedDescription)")
+            }
+
+            // Setup Speech Recognition Request
+            let request = SFSpeechAudioBufferRecognitionRequest()
+            request.shouldReportPartialResults = true
+            request.taskHint = .dictation
+
+            // If on-device recognition is supported, allow it without forcing hard crashes if assets are pending
+            if let recognizer = speechRecognizer, recognizer.supportsOnDeviceRecognition {
+                request.requiresOnDeviceRecognition = false
+            }
+            self.recognitionRequest = request
+
+            // Install Audio Tap on Input Node for live RMS metering and speech stream
+            inputNode.removeTap(onBus: 0)
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+                guard let self = self else { return }
+
+                // 1. Calculate live RMS audio power for waveform
+                let level = self.calculateRMS(from: buffer)
+                Task { @MainActor in
+                    self.audioLevel = level
                 }
 
-                // Setup Speech Recognition Request
-                let request = SFSpeechAudioBufferRecognitionRequest()
-                request.shouldReportPartialResults = true
-                if #available(iOS 13.0, *), let recognizer = speechRecognizer, recognizer.supportsOnDeviceRecognition {
-                    request.requiresOnDeviceRecognition = true
-                }
-                self.recognitionRequest = request
+                // 2. Stream buffer to Speech Recognizer
+                request.append(buffer)
 
-                // Install Audio Tap on Input Node for live RMS metering and speech stream
-                inputNode.removeTap(onBus: 0)
-                inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+                // 3. Write buffer to disk file
+                try? self.audioFile?.write(from: buffer)
+            }
+
+            // Start Speech Recognition Task
+            if let recognizer = speechRecognizer {
+                self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
                     guard let self = self else { return }
 
-                    // 1. Calculate live RMS audio power
-                    let level = self.calculateRMS(from: buffer)
-                    Task { @MainActor in
-                        self.audioLevel = level
+                    if let result = result {
+                        let recognized = result.bestTranscription.formattedString
+                        Task { @MainActor in
+                            self.liveTranscript = recognized
+                        }
                     }
 
-                    // 2. Stream buffer to Speech Recognizer
-                    request.append(buffer)
-
-                    // 3. Write buffer to disk file
-                    try? self.audioFile?.write(from: buffer)
-                }
-
-                // Start Speech Recognition Task
-                if let recognizer = speechRecognizer, recognizer.isAvailable {
-                    self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
-                        guard let self = self else { return }
-
-                        if let result = result {
-                            let recognized = result.bestTranscription.formattedString
-                            Task { @MainActor in
-                                self.liveTranscript = recognized
-                            }
+                    if let error = error {
+                        let nsError = error as NSError
+                        // Ignore standard end-of-audio cancellations (code 216 or 203)
+                        if nsError.domain == "kAFAssistantErrorDomain" && (nsError.code == 203 || nsError.code == 216) {
+                            return
                         }
-
-                        if let error = error {
-                            let nsError = error as NSError
-                            if nsError.domain != "kAFAssistantErrorDomain" || nsError.code != 203 {
-                                print("Speech recognition info: \(error.localizedDescription)")
-                            }
+                        if nsError.code != 1 && nsError.code != 203 {
+                            print("Speech recognition info: \(error.localizedDescription)")
                         }
                     }
                 }
-
-                engine.prepare()
-                try engine.start()
             }
-        } catch {
-            print("Audio engine hardware start notice: \(error.localizedDescription)")
-        }
 
-        self.isRecording = true
+            engine.prepare()
+            try engine.start()
+            self.isRecording = true
+        } catch {
+            print("Audio engine error: \(error.localizedDescription)")
+            self.errorMessage = "Audio engine: \(error.localizedDescription)"
+            self.isRecording = true // Still allow UI to proceed in simulator
+        }
     }
 
     /// Stops audio capture and finalizes the recording
@@ -173,9 +202,18 @@ final class LiveSpeechRecognizer: NSObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    /// Injects text directly (used for quick sample chips or manual simulation in simulator)
+    /// Injects text directly (used for quick sample chips or manual editing)
     func setSampleTranscript(_ text: String) {
         self.liveTranscript = text
+    }
+
+    /// Appends recognized word
+    func appendTranscript(_ text: String) {
+        if liveTranscript.isEmpty {
+            liveTranscript = text
+        } else {
+            liveTranscript += " " + text
+        }
     }
 
     /// Computes normalized RMS level between 0.0 and 1.0 from audio PCM buffer
@@ -190,7 +228,7 @@ final class LiveSpeechRecognizer: NSObject {
             sum += sample * sample
         }
         let rms = sqrt(sum / Float(frames))
-        let scaled = min(max(CGFloat(rms) * 7.5, 0.0), 1.0)
+        let scaled = min(max(CGFloat(rms) * 8.0, 0.0), 1.0)
         return scaled
     }
 }

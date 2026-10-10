@@ -16,6 +16,7 @@ struct HomeView: View {
     @State private var searchText = ""
     @State private var isSearching = false
     @State private var selectedCustomer: String? = nil
+    @State private var expandedGroupId: UUID? = nil
 
     // Compute stats
     private var unpaidEntries: [LedgerEntry] {
@@ -127,17 +128,25 @@ struct HomeView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
                     // 1. Header Branding
-                    TindAIhanHeader(onSettingsTapped: {
-                        isShowingSettings = true
-                    })
+                    TindAIhanHeader(
+                        onSettingsTapped: {
+                            isShowingSettings = true
+                        },
+                        onSpeakTapped: {
+                            speakHomeSummary()
+                        }
+                    )
                     .sheet(isPresented: $isShowingSettings) {
                         DemoSettingsSheet(
                             onResetData: { resetToFigmaDemoData() },
                             onRestartOnboarding: { isShowingOnboarding = true }
                         )
                     }
-                    .sheet(isPresented: $isShowingOnboarding) {
-                        OnboardingView(isCompleted: $isShowingOnboarding)
+                    .fullScreenCover(isPresented: $isShowingOnboarding) {
+                        OnboardingView(isCompleted: Binding(
+                            get: { !isShowingOnboarding },
+                            set: { if $0 { isShowingOnboarding = false } }
+                        ))
                     }
 
                     // 2. Dark Navy Hero Card matching Figma Image 2
@@ -237,46 +246,139 @@ struct HomeView: View {
                             .padding(.horizontal, 20)
                         } else {
                             ForEach(Array(groupedTransactions.enumerated()), id: \.element.id) { index, group in
-                                Button {
-                                    Haptics.light()
-                                    selectedCustomer = group.customer
-                                } label: {
-                                    HStack(spacing: 14) {
-                                        // Customer Avatar
-                                        SukiAvatar(name: group.customer, size: 48)
+                                let isExpanded = expandedGroupId == group.id
 
-                                        // Customer Name & Items
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(group.customer)
-                                                .font(.system(size: 17, weight: .bold, design: .rounded))
-                                                .foregroundStyle(TindAITheme.textPrimary)
-
-                                            Text("\(group.itemsSummary) · \(group.relativeTime)")
-                                                .font(.system(size: 13, weight: .medium, design: .rounded))
-                                                .foregroundStyle(TindAITheme.textSecondary)
-                                                .lineLimit(1)
-                                        }
-
-                                        Spacer()
-
-                                        // Total Price
-                                        VStack(alignment: .trailing, spacing: 3) {
-                                            Text(group.formattedTotal)
-                                                .font(.system(size: 17, weight: .heavy, design: .rounded))
-                                                .foregroundStyle(group.isPaid ? Color.gray : TindAITheme.textPrimary)
-
-                                            if group.isPaid {
-                                                Text("Bayad na")
-                                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                                    .foregroundStyle(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                VStack(spacing: 0) {
+                                    Button {
+                                        Haptics.light()
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                            if expandedGroupId == group.id {
+                                                expandedGroupId = nil
+                                            } else {
+                                                expandedGroupId = group.id
                                             }
                                         }
+                                    } label: {
+                                        HStack(spacing: 14) {
+                                            // Customer Avatar
+                                            SukiAvatar(name: group.customer, size: 48)
+
+                                            // Customer Name & Items
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                HStack(spacing: 6) {
+                                                    Text(group.customer)
+                                                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                                                        .foregroundStyle(TindAITheme.textPrimary)
+
+                                                    Image(systemName: "chevron.down")
+                                                        .font(.system(size: 11, weight: .bold))
+                                                        .foregroundStyle(TindAITheme.textSecondary)
+                                                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                                                }
+
+                                                Text("\(group.itemsSummary) · \(group.relativeTime)")
+                                                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                                                    .foregroundStyle(TindAITheme.textSecondary)
+                                                    .lineLimit(1)
+                                            }
+
+                                            Spacer()
+
+                                            // Total Price
+                                            VStack(alignment: .trailing, spacing: 3) {
+                                                Text(group.formattedTotal)
+                                                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                                                    .foregroundStyle(group.isPaid ? Color.gray : TindAITheme.textPrimary)
+
+                                                if group.isPaid {
+                                                    Text("Bayad na")
+                                                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                                                        .foregroundStyle(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                                }
+                                            }
+                                        }
+                                        .padding(.vertical, 14)
+                                        .padding(.horizontal, 20)
+                                        .contentShape(Rectangle())
                                     }
-                                    .padding(.vertical, 14)
-                                    .padding(.horizontal, 20)
-                                    .contentShape(Rectangle())
+                                    .buttonStyle(.plain)
+
+                                    if isExpanded {
+                                        VStack(alignment: .leading, spacing: 10) {
+                                            Divider().padding(.horizontal, 20)
+
+                                            Text("Mga paninda:")
+                                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                                .foregroundStyle(TindAITheme.textSecondary)
+                                                .padding(.horizontal, 20)
+
+                                            ForEach(group.items) { item in
+                                                HStack {
+                                                    Text("• \(item.quantity)x \(item.item.capitalized)")
+                                                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                                                        .foregroundStyle(TindAITheme.textPrimary)
+                                                    Spacer()
+                                                    Text(item.formattedTotal)
+                                                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                                                        .foregroundStyle(TindAITheme.textSecondary)
+                                                }
+                                                .padding(.horizontal, 20)
+                                            }
+
+                                            HStack(spacing: 8) {
+                                                // TTS Audio Button
+                                                Button {
+                                                    Haptics.light()
+                                                    speakGroup(group)
+                                                } label: {
+                                                    HStack(spacing: 4) {
+                                                        Image(systemName: "speaker.wave.2.fill")
+                                                        Text("Pakinggan")
+                                                    }
+                                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                                    .foregroundStyle(TindAITheme.brandRed)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 6)
+                                                    .background(TindAITheme.brandRed.opacity(0.08), in: Capsule())
+                                                }
+
+                                                // Full history details
+                                                Button {
+                                                    Haptics.light()
+                                                    selectedCustomer = group.customer
+                                                } label: {
+                                                    HStack(spacing: 4) {
+                                                        Image(systemName: "list.bullet")
+                                                        Text("Kasaysayan")
+                                                    }
+                                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                                    .foregroundStyle(TindAITheme.textPrimary)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 6)
+                                                    .background(Color.gray.opacity(0.1), in: Capsule())
+                                                }
+
+                                                Spacer()
+
+                                                // Mark paid directly
+                                                Button {
+                                                    Haptics.success()
+                                                    markGroupPaid(group)
+                                                } label: {
+                                                    Text(group.isPaid ? "Bayad na" : "Bayaran")
+                                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                                        .foregroundStyle(group.isPaid ? Color.green : TindAITheme.tealButton)
+                                                        .padding(.horizontal, 10)
+                                                        .padding(.vertical, 6)
+                                                        .background((group.isPaid ? Color.green : TindAITheme.tealButton).opacity(0.12), in: Capsule())
+                                                }
+                                            }
+                                            .padding(.horizontal, 20)
+                                            .padding(.bottom, 12)
+                                        }
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                    }
                                 }
-                                .buttonStyle(.pressable(scale: 0.98))
 
                                 if index < groupedTransactions.count - 1 {
                                     Divider()
@@ -319,6 +421,30 @@ struct HomeView: View {
         }
         try? modelContext.save()
         Haptics.success()
+    }
+
+    private func speakHomeSummary() {
+        let total = Int(totalUtang)
+        let msg = "Magandang araw! Kabuuang utang para sa araw na ito: \(total) pesos mula sa \(uniqueUnpaidCustomersCount) na suki. May \(overdueCount) na lampas na ng isang linggo."
+        TextToSpeechService.shared.speak(msg)
+    }
+
+    private func speakGroup(_ group: TransactionGroup) {
+        let total = Int(group.total)
+        let items = group.itemsSummary
+        let msg = "\(group.customer): inutang ay \(items). Kabuuang halaga: \(total) pesos."
+        TextToSpeechService.shared.speak(msg)
+    }
+
+    private func markGroupPaid(_ group: TransactionGroup) {
+        withAnimation {
+            for entry in group.items {
+                entry.isPaid = true
+                entry.paidAt = .now
+            }
+            try? modelContext.save()
+            TextToSpeechService.shared.speakPaymentReceived(customer: group.customer, amount: group.total)
+        }
     }
 }
 

@@ -48,18 +48,32 @@ struct TindahanRoofAwning: View {
 /// The Tindahan "A" house illustration with electrical pole and star sparkle from Figma
 struct TindahanIllustration: View {
     var size: CGFloat = 260
+    var showGroundOval: Bool = false
+    var showLightBeam: Bool = true
+    @State private var isSparkling = false
+    @State private var beamOpacity: Double = 0.65
 
     var body: some View {
         ZStack {
-            // Light ground beam shadow
-            Path { path in
-                path.move(to: CGPoint(x: 20, y: size * 0.95))
-                path.addLine(to: CGPoint(x: size * 0.98, y: size * 0.95))
-                path.addLine(to: CGPoint(x: size * 0.85, y: size * 0.35))
-                path.addLine(to: CGPoint(x: size * 0.35, y: size * 0.35))
-                path.closeSubpath()
+            if showLightBeam {
+                // Light ground beam shadow with gentle breathing animation
+                Path { path in
+                    path.move(to: CGPoint(x: 20, y: size * 0.95))
+                    path.addLine(to: CGPoint(x: size * 0.98, y: size * 0.95))
+                    path.addLine(to: CGPoint(x: size * 0.85, y: size * 0.35))
+                    path.addLine(to: CGPoint(x: size * 0.35, y: size * 0.35))
+                    path.closeSubpath()
+                }
+                .fill(Color(red: 250/255, green: 242/255, blue: 226/255))
+                .opacity(beamOpacity)
             }
-            .fill(Color(red: 250/255, green: 242/255, blue: 226/255))
+
+            if showGroundOval {
+                Ellipse()
+                    .fill(TindAITheme.accentYellow)
+                    .frame(width: size * 0.92, height: 20)
+                    .offset(y: (size * 0.9) / 2 - 8)
+            }
 
             // Main "A" Frame Sari-Sari Store
             HStack(alignment: .bottom, spacing: 0) {
@@ -137,16 +151,25 @@ struct TindahanIllustration: View {
                     }
                     .stroke(TindAITheme.darkNavy, lineWidth: 3.5)
 
-                    // Four-point sparkle star
+                    // Four-point sparkle star with pulsing scale and glow
                     FourPointStar()
                         .fill(TindAITheme.brandRed)
                         .frame(width: 24, height: 24)
+                        .scaleEffect(isSparkling ? 1.25 : 0.85)
+                        .rotationEffect(.degrees(isSparkling ? 15 : -15))
+                        .shadow(color: TindAITheme.brandRed.opacity(isSparkling ? 0.7 : 0.2), radius: isSparkling ? 8 : 2)
                         .offset(x: 15, y: -130)
                 }
                 .frame(width: 80, height: 160)
             }
         }
         .frame(width: size, height: size * 0.9)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                isSparkling = true
+                beamOpacity = 1.0
+            }
+        }
     }
 }
 

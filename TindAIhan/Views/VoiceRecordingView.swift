@@ -4,7 +4,8 @@
 //
 //  Created for AppBuildersPH Hackathon 2026.
 //  Fullscreen voice recording modal matching Figma wireframe 2 (Voice Recording).
-//  Supports true real-time streaming speech recognition & live mic audio level metering.
+//  Supports true real-time streaming speech recognition, live mic audio level metering,
+//  text-to-speech audition, and instant manual dictation fallback.
 //
 
 import SwiftUI
@@ -19,8 +20,9 @@ struct VoiceRecordingView: View {
     @State private var showCursor = true
     @State private var isProcessing = false
     @State private var pulseScale: CGFloat = 1.0
+    @State private var isEditingTranscript = false
 
-    // Sample quick-tap phrases for simulator / instant testing
+    // Sample quick-tap phrases for instant testing & audition
     private let samplePhrases = [
         "Utang ni Aling Nena, dalawang sardinas tsaka tatlong itlog",
         "Mang Jose, dalawang kilo bigas",
@@ -33,12 +35,13 @@ struct VoiceRecordingView: View {
             TindAITheme.darkNavy
                 .ignoresSafeArea()
 
-            VStack(spacing: 20) {
+            VStack(spacing: 18) {
                 // 1. Top Navigation Bar
                 HStack {
                     Button("Cancel") {
                         Haptics.light()
                         speechRecognizer.stop()
+                        TextToSpeechService.shared.stop()
                         isPresented = false
                     }
                     .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -91,6 +94,19 @@ struct VoiceRecordingView: View {
 
                         Spacer()
 
+                        // Manual keyboard toggle button
+                        Button {
+                            Haptics.light()
+                            isEditingTranscript.toggle()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: isEditingTranscript ? "checkmark.circle.fill" : "keyboard")
+                                Text(isEditingTranscript ? "Tapos" : "I-type")
+                            }
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(TindAITheme.accentYellow)
+                        }
+
                         if speechRecognizer.isRecording {
                             HStack(spacing: 4) {
                                 Circle()
@@ -100,25 +116,34 @@ struct VoiceRecordingView: View {
                                     .font(.system(size: 10, weight: .black, design: .rounded))
                                     .foregroundStyle(TindAITheme.brandRed)
                             }
+                            .padding(.leading, 8)
                         }
                     }
 
-                    HStack(alignment: .top, spacing: 2) {
-                        let text = speechRecognizer.liveTranscript.isEmpty
-                            ? "“Magsalita ng utang o pumili sa ibaba…”"
-                            : "“\(speechRecognizer.liveTranscript)”"
+                    if isEditingTranscript {
+                        TextField("I-type ang utang (Hal. Utang ni Pedro 2 itlog)", text: $speechRecognizer.liveTranscript)
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(10)
+                            .background(Color.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                    } else {
+                        HStack(alignment: .top, spacing: 2) {
+                            let text = speechRecognizer.liveTranscript.isEmpty
+                                ? "“Magsalita ng utang o pumili sa ibaba…”"
+                                : "“\(speechRecognizer.liveTranscript)”"
 
-                        Text(text)
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(speechRecognizer.liveTranscript.isEmpty ? .white.opacity(0.4) : .white)
-                            .lineSpacing(4)
-                            .animation(.default, value: speechRecognizer.liveTranscript)
+                            Text(text)
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundStyle(speechRecognizer.liveTranscript.isEmpty ? .white.opacity(0.4) : .white)
+                                .lineSpacing(4)
+                                .animation(.default, value: speechRecognizer.liveTranscript)
 
-                        if speechRecognizer.isRecording {
-                            Text("|")
-                                .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundStyle(TindAITheme.accentYellow)
-                                .opacity(showCursor ? 1.0 : 0.0)
+                            if speechRecognizer.isRecording {
+                                Text("|")
+                                    .font(.system(size: 18, weight: .black, design: .rounded))
+                                    .foregroundStyle(TindAITheme.accentYellow)
+                                    .opacity(showCursor ? 1.0 : 0.0)
+                            }
                         }
                     }
                 }
@@ -127,12 +152,15 @@ struct VoiceRecordingView: View {
                 .background(TindAITheme.cardNavyLight, in: RoundedRectangle(cornerRadius: 20))
                 .padding(.horizontal, 24)
 
-                // 5. Quick Test Suggestions (Perfect for Simulator and Noisy Environment)
+                // 5. Quick Test Suggestions (Speaks aloud via TTS & populates)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("💡 O pumili ng halimbawa para subukan:")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.horizontal, 24)
+                    HStack {
+                        Text("💡 O pumili ng halimbawa para pakinggan at subukan:")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.6))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 24)
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -140,18 +168,23 @@ struct VoiceRecordingView: View {
                                 Button {
                                     Haptics.light()
                                     speechRecognizer.setSampleTranscript(phrase)
+                                    TextToSpeechService.shared.speak(phrase)
                                 } label: {
-                                    Text(phrase)
-                                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.9))
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            speechRecognizer.liveTranscript == phrase
-                                                ? TindAITheme.brandRed
-                                                : TindAITheme.cardNavyLight,
-                                            in: Capsule()
-                                        )
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "speaker.wave.2.fill")
+                                            .font(.system(size: 11))
+                                        Text(phrase)
+                                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                                    }
+                                    .foregroundStyle(.white.opacity(0.9))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        speechRecognizer.liveTranscript == phrase
+                                            ? TindAITheme.brandRed
+                                            : TindAITheme.cardNavyLight,
+                                        in: Capsule()
+                                    )
                                 }
                                 .buttonStyle(.pressable(scale: 0.95))
                             }
@@ -213,6 +246,7 @@ struct VoiceRecordingView: View {
         }
         .onDisappear {
             speechRecognizer.stop()
+            TextToSpeechService.shared.stop()
         }
     }
 
@@ -234,7 +268,7 @@ struct VoiceRecordingView: View {
         Task {
             var utterance = speechRecognizer.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            // If nothing spoken, pick a sensible default
+            // If nothing was captured, use default sample
             if utterance.isEmpty {
                 utterance = samplePhrases[0]
             }

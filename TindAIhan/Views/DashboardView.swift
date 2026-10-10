@@ -15,7 +15,7 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var entries: [LedgerEntry]
 
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+    @AppStorage("hasCompletedOnboarding_v2026") private var hasCompletedOnboarding: Bool = false
 
     @State private var selectedTab: TabItem = .list
     @State private var isShowingVoiceModal = false
